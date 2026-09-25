@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ball-show"
+description = "Enables the ball_show command without any pre-configured scope."
+commands.allow = ["ball_show"]
+
+[[permission]]
+identifier = "deny-ball-show"
+description = "Denies the ball_show command without any pre-configured scope."
+commands.deny = ["ball_show"]

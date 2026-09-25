@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-keys-set"
+description = "Enables the keys_set command without any pre-configured scope."
+commands.allow = ["keys_set"]
+
+[[permission]]
+identifier = "deny-keys-set"
+description = "Denies the keys_set command without any pre-configured scope."
+commands.deny = ["keys_set"]

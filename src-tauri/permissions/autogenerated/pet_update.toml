@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-pet-update"
+description = "Enables the pet_update command without any pre-configured scope."
+commands.allow = ["pet_update"]
+
+[[permission]]
+identifier = "deny-pet-update"
+description = "Denies the pet_update command without any pre-configured scope."
+commands.deny = ["pet_update"]

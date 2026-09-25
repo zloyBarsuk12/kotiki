@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Окна питомцев: движение окна, экраны, события из трея, открыть окно настроек",
+  "windows": ["pet*", "guest", "ball", "laser", "butterfly", "bed", "yarn", "post", "bubbles", "nest", "mouse", "gift", "bowl", "poll"],
+  "permissions": ["core:default", "allow-frame", "allow-screens", "allow-open-settings", "allow-prop-show", "allow-prop-hide", "allow-bed-pos", "allow-nudge-cursor", "allow-save-photo", "allow-calendar-get", "allow-caldav-get", "allow-caldav-fetch", "allow-desk-info", "allow-whoami", "allow-update-now", "allow-pet-visible", "allow-guest-show", "allow-guest-hide", "allow-speak", "allow-tts-get", "allow-input-info", "allow-pet-update"]
+}

@@ -1,0 +1,65 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Kotik",
+  "version": "1.45.0",
+  "identifier": "io.github.zloybarsuk12.kotik",
+  "build": {
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [],
+    "security": {
+      "csp": null
+    },
+    "macOSPrivateApi": true
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis",
+      "app",
+      "dmg"
+    ],
+    "publisher": "Kotik",
+    "shortDescription": "Котик на рабочем столе",
+    "longDescription": "Котики и щенки, которые гуляют по экрану, играют, спят и просят есть.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "languages": [
+          "Russian"
+        ],
+        "displayLanguageSelector": false,
+        "installMode": "currentUser"
+      }
+    },
+    "createUpdaterArtifacts": true,
+    "macOS": {
+      "minimumSystemVersion": "12.0",
+      "signingIdentity": "-"
+    },
+    "category": "Entertainment"
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENDOTRFMzYwMDRFNEZDMzgKUldRNC9PUUVZT09VekF2c1dGaWFDWkh2djBTcUoxWCsxRlVnUndKbkloSm9wSlNmeTRYMHR6dXgK",
+      "endpoints": [
+        "https://github.com/zloyBarsuk12/kotiki/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "quiet"
+      }
+    }
+  }
+}

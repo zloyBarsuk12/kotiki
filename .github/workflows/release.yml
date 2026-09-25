@@ -1,0 +1,57 @@
+# Сборка и выпуск по тегу v*: Windows (NSIS) и macOS (Apple Silicon, Intel) на раннерах GitHub.
+# tauri-action создаёт Release, кладёт установщики и собирает latest.json для автообновления.
+# Секрет TAURI_SIGNING_PRIVATE_KEY — ключ подписи обновлений (Settings → Secrets → Actions).
+# Запуска по pull_request нет намеренно: чужой код не получает ни секретов, ни права записи.
+name: Release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            args: --bundles nsis
+          - os: macos-latest
+            args: --target aarch64-apple-darwin --bundles app,dmg
+          - os: macos-latest
+            args: --target x86_64-apple-darwin --bundles app,dmg
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: dtolnay/rust-toolchain@stable
+        if: runner.os == 'macOS'
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: dtolnay/rust-toolchain@stable
+        if: runner.os != 'macOS'
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Release notes
+        id: notes
+        shell: bash
+        run: |
+          { echo 'body<<NOTES_EOF'; cat .github/release-notes.md; echo 'NOTES_EOF'; } >> "$GITHUB_OUTPUT"
+      - run: npm install --no-audit --no-fund
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: Котик ${{ github.ref_name }}
+          releaseBody: ${{ steps.notes.outputs.body }}
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true
+          args: ${{ matrix.args }}

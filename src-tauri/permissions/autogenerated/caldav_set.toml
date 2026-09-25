@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-caldav-set"
+description = "Enables the caldav_set command without any pre-configured scope."
+commands.allow = ["caldav_set"]
+
+[[permission]]
+identifier = "deny-caldav-set"
+description = "Denies the caldav_set command without any pre-configured scope."
+commands.deny = ["caldav_set"]

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-prop-show"
+description = "Enables the prop_show command without any pre-configured scope."
+commands.allow = ["prop_show"]
+
+[[permission]]
+identifier = "deny-prop-show"
+description = "Denies the prop_show command without any pre-configured scope."
+commands.deny = ["prop_show"]

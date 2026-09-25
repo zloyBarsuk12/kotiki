@@ -1,0 +1,16 @@
+{
+  "name": "kotik",
+  "private": true,
+  "version": "1.45.0",
+  "description": "Котик — питомцы на рабочем столе Windows и macOS (Tauri 2)",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "build:win": "tauri build --runner cargo-xwin --target x86_64-pc-windows-msvc"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  },
+  "license": "MIT"
+}

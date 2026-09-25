@@ -1,0 +1,794 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Питомцы</title>
+<style>
+  :root {
+    --bg: #f6f2ec; --card: #fffdf9; --line: #e6ddd1; --text: #2b2520; --muted: #857a6e;
+    --accent: #d9722f; --accent-soft: #fbe6d6; --floor: #efe7dc; --danger: #b8453a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1d1b19; --card: #272421; --line: #3a3531; --text: #f1ebe4; --muted: #a39a90;
+      --accent: #f08a45; --accent-soft: #43301f; --floor: #302b27; --danger: #e0766b; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 "Segoe UI", system-ui, sans-serif; }
+  header { position: sticky; top: 0; z-index: 2; background: var(--bg); padding: 18px 20px 12px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  h1 { margin: 0; font-size: 20px; font-weight: 700; flex: 1; }
+  header p { margin: 2px 0 0; color: var(--muted); font-size: 12.5px; }
+  .add { display: flex; gap: 6px; flex-wrap: wrap; }
+  button { font: inherit; cursor: pointer; border-radius: 9px; border: 1px solid var(--line); background: var(--card); color: var(--text); padding: 7px 12px; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  main { padding: 14px 20px 24px; display: grid; gap: 12px; }
+  .pet { display: grid; grid-template-columns: 176px 1fr; gap: 16px; background: var(--card); border: 1.5px solid var(--line);
+    border-radius: 14px; padding: 12px; transition: border-color .2s, box-shadow .2s; }
+  .pet.sel { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .stage { width: 176px; height: 144px; border-radius: 10px; overflow: hidden; position: relative;
+    background: linear-gradient(to bottom, transparent 70%, var(--floor) 70%); }
+  .stage iframe { position: absolute; left: 0; top: 0; width: 220px; height: 180px; border: 0; transform: scale(.8); transform-origin: 0 0; pointer-events: none; background: transparent; }
+  .info { min-width: 0; display: grid; gap: 9px; align-content: start; }
+  .title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }   /* имя, теги, бейджи и «Убрать» переносятся, а не вылезают за карточку */
+  .title b { font-size: 16px; }
+  .title input.nm { font: inherit; font-size: 16px; font-weight: 700; color: var(--text); background: transparent; border: 0; border-bottom: 1.5px dashed var(--line); padding: 0 2px; flex: 1 1 60px; width: 0; min-width: 60px; }
+  .title { min-width: 0; }
+  .title .tag, .title .rm { flex: none; }
+  .title .tag.ach, .title .tag.rel { flex: 0 1 auto; min-width: 0; max-width: 100%; white-space: normal; }   /* длинные списки бейджей и друзей переносятся внутри */
+  .title input.nm:focus { outline: none; border-bottom-color: var(--accent); }
+  .title input.nm::placeholder { color: var(--muted); font-weight: 600; }
+  .tag { font-size: 11.5px; color: var(--muted); border: 1px solid var(--line); border-radius: 20px; padding: 1px 8px; }
+  .title .rm { margin-left: auto; padding: 4px 10px; font-size: 12.5px; color: var(--danger); }
+  main, .blk { overflow-x: clip; }   /* страховка: горизонтальной прокрутки в окне быть не должно */
+  .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .lbl { width: 92px; color: var(--muted); font-size: 12.5px; flex: none; }
+  .sw { width: 28px; height: 28px; padding: 0; border-radius: 50%; border: 2px solid transparent; box-shadow: inset 0 0 0 1px rgba(0,0,0,.18); }
+  .sw.on { border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--card), inset 0 0 0 3px rgba(0,0,0,.12); }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; padding: 5px 12px; background: transparent; }
+  .seg button.on { background: var(--accent); color: #fff; font-weight: 600; }
+  input[type=color] { width: 36px; height: 28px; padding: 0 2px; border: 1px solid var(--line); border-radius: 7px; background: var(--card); cursor: pointer; }
+  .link { background: none; border: 0; padding: 2px 4px; color: var(--accent); font-size: 12.5px; text-decoration: underline; }
+  .link:disabled { visibility: hidden; }
+  .empty { color: var(--muted); padding: 30px; text-align: center; }
+  .look { display: none; border-top: 1px dashed var(--line); padding-top: 10px; margin-top: 2px; gap: 10px; grid-column: 1 / -1; }
+  .look.on { display: grid; }
+  .look h4 { margin: 0 0 4px; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .sw-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 8px 6px; }
+  .sw-grid label { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; color: var(--muted); text-align: center; cursor: pointer; }
+  .cl { width: 34px; height: 26px; padding: 0 2px; border: 1px solid var(--line); border-radius: 7px; background: var(--card); cursor: pointer; }
+  .sl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 14px; }
+  .sl-grid label { display: grid; grid-template-columns: 78px 1fr; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+  .sl-grid input[type=range] { width: 100%; accent-color: var(--accent); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font: inherit; font-size: 12px; padding: 4px 10px; border-radius: 20px; border: 1px solid var(--line); background: var(--card); color: var(--text); cursor: pointer; }
+  .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .cal { padding: 10px 20px 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
+  .cal select { font: inherit; font-size: 12.5px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); }
+  .cal input { flex: 1; min-width: 220px; font: inherit; font-size: 12.5px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); }
+  @media (max-width: 470px) { .pet { grid-template-columns: 1fr; } .stage { margin: 0 auto; } }
+  .pp-row { display: inline-flex; align-items: center; gap: 4px; margin: 1px 10px 1px 0; white-space: nowrap; }
+  .pp { width: 34px; height: 28px; object-fit: contain; vertical-align: middle; display: none; }
+  .pp[src] { display: inline-block; }
+  .tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+  .tab { border-radius: 9px; padding: 7px 14px; font-weight: 600; }
+  .tab.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .pane { display: none; padding-bottom: 20px; } .pane.on { display: block; }
+  .blk { padding: 12px 20px 0; font-size: 13px; }
+  .blk h3 { margin: 0 0 8px; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .blk input:not([type=checkbox]):not([type=file]), .blk select { font: inherit; font-size: 12.5px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); }
+  .cal-row input[type=url], .cal-row input[type=email], .cal-row input[type=password] { flex: 1; min-width: 200px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+  .frow { display: grid; grid-template-columns: 110px 1fr; gap: 8px 12px; align-items: center; margin-bottom: 8px; } .frow > span:first-child { color: var(--muted); }
+  .tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+  .tbl th { text-align: left; color: var(--muted); font-weight: 600; padding: 6px 10px; border-bottom: 1px solid var(--line); font-size: 11.5px; }
+  .tbl td { padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; } .tbl tr:last-child td { border-bottom: 0; }
+  .feed { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 6px 12px; max-height: 260px; overflow: auto; font-size: 12.5px; }
+  .feed div { padding: 4px 0; border-top: 1px solid var(--line); } .feed div:first-child { border-top: 0; } .feed .t { color: var(--muted); margin-right: 8px; }
+  .st-home { color: #3a9a4a; } .st-away { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <div style="flex:1;min-width:200px"><h1>Питомцы</h1><p>Правый клик по зверю открывает это окно. Изменения видно сразу.</p></div>
+  <nav class="tabs"><button class="tab" data-tab="pets">🐾 Питомцы</button><button class="tab" data-tab="net">🌐 Сеть</button><button class="tab" data-tab="home">🏠 Дом</button><button class="tab" data-tab="cal">📅 Календарь и напоминания</button></nav>
+</header>
+
+<section class="pane" data-pane="pets">
+<div class="blk">
+  <div class="add"><button class="primary" data-sp="cat">+ Котик</button><button class="primary" data-sp="dog">+ Щенок</button><button class="primary" data-sp="hamster">+ Хомячок</button><button class="primary" data-sp="bird">+ Попугай</button><button class="primary" data-sp="rabbit">+ Кролик</button><button class="primary" data-sp="dragon">+ Дракончик</button><button class="primary" data-sp="kuzya">+ Кузя</button><button class="primary" data-sp="clippy">+ Скрепка</button></div>
+</div>
+<div class="blk" id="kids" title="Родители — один вид, мальчик и девочка. Малыш получит половину черт от каждого, цвета смешаются, чуть-чуть случайности. Родится маленьким и вырастет за месяц">
+  🍼 Потомство: <select id="pa"></select> + <select id="pb"></select> <button class="link" id="kid-go">родить малыша</button><span id="kid-st"></span>
+</div>
+<main id="list"><div class="empty">Загружаю…</div></main>
+<div class="blk">
+  <h3>Свой персонаж из картинки</h3>
+  <input type="file" id="cs-file" accept="image/*"> <input id="cs-name" type="text" placeholder="имя" size="10" maxlength="24"> <button class="link" id="cs-go">вырезать и добавить</button><span id="cs-st"></span>
+  <div style="color:var(--muted);font-size:12px;margin-top:4px">Фото кота, собаки, игрушки, коллеги — что угодно с одним предметом на снимке. Фон вырежет портал (5–15 с), персонаж будет ходить как марионетка. Шею, ноги, размер и глаза потом можно подстроить в его карточке.</div>
+</div>
+<div class="blk">
+  <h3>Перенос</h3>
+  <button class="link" id="ex-go">сохранить питомцев в файл</button> <label class="link" style="cursor:pointer">загрузить из файла <input type="file" id="im-file" accept="application/json" style="display:none"></label> <span id="ex-st"></span>
+</div>
+</section>
+
+<section class="pane" data-pane="net">
+<div class="blk" id="vs-box">
+  <div class="row"><label><input type="checkbox" id="vs-on"> ходят в гости и принимают гостей</label> <span id="vs-me" style="color:var(--muted)"></span> <a class="link" id="vs-page" href="#" style="margin-left:8px">страница сети</a></div>
+  <div id="vs-away" style="margin-top:6px;color:var(--muted)"></div>
+  <div class="row" style="margin-top:8px">Мой статус: <select id="mood"><option value="">без статуса</option><option>на обеде</option><option>не беспокоить</option><option>на встрече</option><option>в отпуске</option><option value="custom">свой…</option></select> <input id="mood-text" maxlength="24" placeholder="свой статус" style="width:160px;display:none"> <span style="color:var(--muted);font-size:12px">питомец носит табличку, коллеги видят статус; «не беспокоить» — без гостей и дискотек</span></div>
+</div>
+<div class="blk">
+  <h3>Сообщения от коллег <button class="link" id="notes-clear" style="margin-left:8px;font-size:12px">очистить</button></h3>
+  <div id="notes" class="card" style="max-height:220px;overflow:auto;font-size:13px;color:var(--muted)">пока никто ничего не передавал — записка приходит с питомцем коллеги, гость показывает её у курсора, а здесь она остаётся</div>
+</div>
+<div class="blk">
+  <h3>Подарки <button class="link" id="gifts-clear" style="margin-left:8px;font-size:12px">очистить</button></h3>
+  <div id="gifts" class="card" style="max-height:200px;overflow:auto;font-size:13px;color:var(--muted)">пока пусто — здесь будут подарки, которые вам прислали и которые отправили вы</div>
+</div>
+<div class="blk">
+  <h3>Кто онлайн</h3>
+  <div id="vs-peers" style="color:var(--muted)">сейчас никого нет онлайн</div>
+</div>
+<div class="blk">
+  <h3>Отправить</h3>
+  <div id="vs-send" class="card" style="display:none">
+    <div class="frow"><span>Кому</span><span><select id="vs-to"></select> <span id="vs-to-note" style="color:var(--muted);font-size:12px"></span></span></div>
+    <div class="frow"><span>🚪 В гости</span><span><select id="vs-pet"></select> <button class="link" id="vs-visit-go">отправить в гости</button> <button class="link" id="vs-note-go" title="питомец отнесёт подпись из поля ниже и скажет её вслух у коллеги">✉ передать на словах</button> <span id="vs-visit-st" style="color:var(--muted)"></span></span></div>
+    <div class="frow"><span>🎁 Подарок</span><span><select id="vs-gift"></select> <input id="gift-msg" maxlength="80" placeholder="подпись (для открытки — её текст)" style="width:240px"> <button class="link" id="vs-gift-go">подарить</button> <span id="vs-gift-st" style="color:var(--muted)"></span></span></div>
+  </div>
+</div>
+<div class="blk">
+  <h3>Спросить всех</h3>
+  <div class="card">
+    <div class="frow"><span>Вопрос</span><span><input id="poll-text" maxlength="80" placeholder="Обед в 13:00?" style="width:300px"></span></div>
+    <div class="frow"><span>Варианты</span><span><input id="poll-o1" maxlength="20" value="да" style="width:90px"> <input id="poll-o2" maxlength="20" value="нет" style="width:90px"> <input id="poll-o3" maxlength="20" placeholder="третий" style="width:90px"> <button class="link" id="poll-go">спросить</button> <span id="poll-st" style="color:var(--muted)"></span></span></div>
+    <div style="color:var(--muted);font-size:12px">У всех, кто онлайн, питомец принесёт окошко с вопросом; итог через 30 минут — в ленте и у вашего питомца.</div>
+  </div>
+  <div class="row" style="margin-top:8px"><label><input type="checkbox" id="album-on"> делиться фото в общем альбоме (селфи с гостями, фото из трея)</label></div>
+</div>
+<div class="blk">
+  <h3>Лента</h3>
+  <div id="vs-feed" class="feed"></div>
+</div>
+</section>
+
+<section class="pane" data-pane="home">
+<div class="blk">
+  <h3>Задания дня</h3>
+  <div id="quests" style="color:var(--muted);font-size:13px">пока не выданы</div><div id="pairq" style="color:var(--muted);font-size:12px;margin-top:4px"></div>
+</div>
+<div class="blk">
+  <h3>Отношения</h3>
+  <div id="rels" class="card" style="font-size:13px;color:var(--muted)">пока не с кем: отношения появляются, когда питомцы играют и болтают</div>
+
+</div>
+<div class="blk">
+  <h3>Домик</h3>
+  <div class="row"><label><input type="checkbox" id="bed-house"> домик вместо лежанки — ночью светится окошко, если кто-то спит</label></div>
+</div>
+<div class="blk">
+  <h3>День рождения хозяина</h3>
+  <div class="row">🎂 <input id="owner-bday" placeholder="дд.мм" maxlength="5" style="width:70px"> <span style="color:var(--muted);font-size:12px">в этот день питомцы поздравят, а коллеги узнают из ленты</span></div>
+</div>
+</section>
+
+<section class="pane" data-pane="cal">
+<div class="blk" title="Яндекс.Календарь → Настройки → Экспорт → «Ссылка на календарь» (приватная .ics). Питомец напомнит о встрече за 5 минут">
+  <h3>Календарь по ссылке (.ics)</h3>
+  <div class="row cal-row"><input id="cal" type="url" placeholder="https://calendar.yandex.ru/export/ics.xml?private_token=…" spellcheck="false"><button class="link" id="cal-save">сохранить</button><span id="cal-st"></span></div>
+</div>
+<div class="blk" id="caldav" title="Яндекс.Календарь по CalDAV: все ваши календари, повторы раскрываются. Пароль приложения: id.yandex.ru → Безопасность → Пароли приложений → «Календарь CalDAV»">
+  <h3>Яндекс.Календарь (CalDAV)</h3>
+  <div class="row cal-row"><input id="cd-user" type="email" placeholder="логин" spellcheck="false" style="width:190px"> <input id="cd-pass" type="password" placeholder="пароль приложения" style="width:150px"><button class="link" id="cd-save">сохранить</button><button class="link" id="cd-test">проверить</button><span id="cd-st" style="white-space:normal;word-break:break-all"></span></div>
+</div>
+<div class="blk">
+  <h3>Тихие часы</h3>
+  <div class="row">с <input id="q-from" type="time" style="width:110px"> до <input id="q-to" type="time" style="width:110px"> ежедневно <button class="link" id="q-save">сохранить</button> <button class="link" id="q-clear">убрать</button> <span id="q-st" style="color:var(--muted);font-size:12px"></span></div>
+</div>
+<div class="blk" title="Старший питомец в назначенное время подойдёт к курсору и скажет напоминание вслух (озвучка — если включена в трее)">
+  <h3>Напоминания</h3>
+  <div class="row"><input id="rem-at" type="time" style="width:110px"> <input id="rem-text" maxlength="80" placeholder="что напомнить" style="width:260px"> <button class="link" id="rem-add">добавить</button> <button class="link" id="rem-15">через 15 мин</button> <button class="link" id="rem-60">через час</button></div>
+  <div id="rem-list" style="margin-top:4px;color:var(--muted);font-size:12px"></div>
+</div>
+</section>
+<script src="edition.js"></script><script src="gifts.js"></script><script src="palettes.js"></script>
+<script src="looks.js"></script>
+<script>
+(() => {
+  const T = window.__TAURI__, invoke = T && T.core.invoke;
+  const MAX = 12;
+  // выпуск (edition.js): без api — общий, сети питомцев нет: вкладка «Сеть» убирается, фон своего персонажа не вырезается
+  const ED = window.KOTIK_EDITION || {}, NET = ED.api || '';
+  if (!NET) document.querySelectorAll('[data-tab="net"], [data-pane="net"]').forEach(el => { el.style.display = 'none'; });   // скрыть, не удалять: ниже на элементы вешаются обработчики
+  { const u = document.getElementById('cd-user'); if (u && ED.mailHint) u.placeholder = ED.mailHint; }
+  const list = document.getElementById('list');
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));   // объявлен раньше всех: его зовут при загрузке (напоминания, полка)
+  let pets = [], selected = window.SELECT_PET || null;
+  // Вкладки: активная запоминается; открытие окна по правому клику на питомце — всегда «Питомцы»
+  function showTab(name) {
+    document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+    document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.dataset.pane === name));
+    if (!NET && name === 'net') name = 'pets';
+    try { localStorage.setItem('tab', name); if (name === 'net') { localStorage.setItem('notes:seen', String(Date.now())); if (typeof notesShow === 'function') setTimeout(notesShow, 50); } } catch (_) { /* без памяти */ }
+  }
+  // окно подгоняет высоту под содержимое: при загрузке, смене вкладки и любой перестройке разметки
+  // (ResizeObserver на body), пока пользователь сам не изменил размер — тогда больше не вмешиваемся
+  let fitAt = 0, fitManual = false, fitTimer = 0;
+  function fit() {
+    if (fitManual || !invoke) return; clearTimeout(fitTimer);
+    fitTimer = setTimeout(() => { fitAt = Date.now(); invoke('settings_fit', { h: Math.ceil(document.documentElement.scrollHeight) }).catch(() => {}); }, 120);
+  }
+  window.addEventListener('resize', () => { if (fitAt && Date.now() - fitAt > 1500) fitManual = true; });   // не наш — значит, пользователь
+  if (window.ResizeObserver) new ResizeObserver(fit).observe(document.body);
+  window.addEventListener('load', fit);
+  document.querySelectorAll('.tab').forEach(b => b.onclick = () => { showTab(b.dataset.tab); fit(); });
+  { let t = 'pets'; try { t = localStorage.getItem('tab') || 'pets'; } catch (_) { /* без памяти */ } showTab(window.SELECT_PET ? 'pets' : t); }
+  const SPN = { cat: 'Котик', dog: 'Щенок', hamster: 'Хомячок', bird: 'Попугай', rabbit: 'Кролик', dragon: 'Дракончик', kuzya: 'Домовёнок', clippy: 'Скрепка', round: 'Круглыш', custom: 'Свой' };
+  const SPICO = { cat: '🐱', dog: '🐶', hamster: '🐹', bird: '🦜', rabbit: '🐰', dragon: '🐉', kuzya: '🧙', clippy: '📎', round: '⚪', custom: '🖼' };
+
+  function swatchBg(p) {                       // кружок окраса: основа + второй цвет узора
+    const second = p.points || p.stripe || p.patch || p.black || p.headC || p.earC || (p.head && p.head !== p.fur ? p.head : null) || p.wing || p.chest || p.fur;
+    return `linear-gradient(135deg, ${p.fur} 0 56%, ${second} 56% 100%)`;
+  }
+  function previewSrc(p) {
+    const q = new URLSearchParams({ demo: 1, anim: 1, sp: p.sp, c: p.color, build: p.build || 'normal', pose: 'sit' });
+    if (p.fur) q.set('fur', p.fur);
+    if (p.look && p.look.length < 60000) q.set('look', p.look); else if (p.look) { try { sessionStorage.setItem('look:' + p.label, p.look); q.set('lookKey', 'look:' + p.label); } catch (_) {} }
+    return 'index.html?v=' + Date.now() + '#' + q.toString();
+  }
+  const lookOf = p => { try { return p.look ? JSON.parse(p.look) : {}; } catch (_) { return {}; } };
+  const sexOf = p => { const list = PALETTES[p.sp] || PALETTES.cat, base = list[p.color % list.length] || {}; return p.sex || base.sex || 'm'; };
+  const mates = (a, b) => a !== b && a.sp === b.sp && sexOf(a) !== sexOf(b);   // потомство: один вид и разный пол
+  const setLook = (p, look) => { p.look = JSON.stringify(look); };
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+  const shade = window.LOOKS.shade, randomLook = window.LOOKS.randomLook;
+  const timers = {};
+  // Потомство: пара только внутри вида и разного пола. Списки пересобираются при каждом изменении
+  // питомца (пол, окрас, вид), иначе после переключения «Он/Она» они оставались пустыми.
+  function kidsRender() {
+    const pname = p => (p.name || (PALETTES[p.sp] || PALETTES.cat)[p.color % (PALETTES[p.sp] || PALETTES.cat).length].name) + ' (' + (SPN[p.sp] || p.sp) + ')';
+    const pa = document.getElementById('pa'), pb = document.getElementById('pb'), keepA = pa.value, keepB = pb.value;
+    const withMate = pets.filter(p => pets.some(q => mates(p, q)));
+    pa.innerHTML = withMate.map(p => `<option value="${p.label}">${pname(p)}</option>`).join('');
+    if (withMate.some(p => p.label === keepA)) pa.value = keepA;
+    const fillB = () => { const A = pets.find(p => p.label === pa.value); pb.innerHTML = pets.filter(p => A && mates(A, p)).map(p => `<option value="${p.label}">${pname(p)}</option>`).join(''); if ([...pb.options].some(o => o.value === keepB)) pb.value = keepB; };
+    pa.onchange = fillB; fillB();
+    document.getElementById('kids').style.display = withMate.length >= 2 && pets.length < MAX ? '' : 'none';
+  }
+  function save(p, now) {
+    kidsRender();
+    clearTimeout(timers[p.label]);
+    const go = () => invoke('pet_update', { label: p.label, color: p.color, build: p.build || 'normal', fur: p.fur || '', name: p.name || '', sex: p.sex || '', look: p.look || '' }).catch(e => console.error(e));
+    now ? go() : (timers[p.label] = setTimeout(go, 150));
+  }
+
+  function card(p) {
+    const pal = PALETTES[p.sp] || PALETTES.cat;
+    const el = document.createElement('section');
+    el.className = 'pet' + (p.label === selected ? ' sel' : '');
+    el.dataset.label = p.label;
+    el.innerHTML = `
+      <div class="stage"><iframe title="превью"></iframe></div>
+      <div class="info">
+        <div class="title"><input class="nm" type="text" size="6" maxlength="24" title="Имя питомца — так его будут звать в репликах" spellcheck="false"><span class="tag">${SPN[p.sp] || ''}</span><span class="tag bt"></span><span class="tag ach" title="достижения" style="border:0"></span><span class="tag rel" title="отношения с другими питомцами" style="border:0"></span><button class="link card-go" title="сохранить картинку со статистикой в «Изображения/Котик»">карточка</button>
+          <button class="rm" title="Убрать с рабочего стола">Убрать</button></div>
+        <div class="row"><span class="lbl">Окрас</span><span class="sws row" style="gap:6px"></span></div>
+        <div class="row"><span class="lbl">${p.sp === 'bird' ? 'Цвет перьев' : p.sp === 'dragon' ? 'Цвет чешуи' : p.sp === 'kuzya' ? 'Цвет рубахи' : p.sp === 'clippy' ? 'Цвет металла' : p.sp === 'round' ? 'Цвет тела' : 'Свой цвет'}</span><input type="color" class="fur"><button class="link reset">вернуть как было</button></div>
+        <div class="row"><span class="lbl">Пол</span><span class="seg sex"><button data-s="m">Он</button><button data-s="f">Она</button></span><span class="tag" style="border:0">для реплик</span></div>
+        <div class="row mon-row" style="display:none"><span class="lbl">Монитор</span><select class="mon"></select></div>
+        <div class="row"><span class="lbl">Телосложение</span><span class="seg"><button data-b="normal">Обычный</button><button data-b="chubby">Пухляш</button></span></div>
+        <div class="row"><span class="lbl"></span><button class="link tgl">настроить внешность ▾</button><button class="link rnd">🎲 случайный</button><button class="link reset-look" style="color:var(--danger)">сбросить</button></div>
+        <div class="look">
+          <div><h4>Цвета</h4><div class="sw-grid">
+            <label data-sp="cat dog hamster rabbit"><input type="color" class="cl" data-k="chest">грудка</label>
+            <label data-sp="dragon"><input type="color" class="cl" data-k="chest">живот</label><label data-sp="dragon"><input type="color" class="cl" data-k="wing">крылья</label><label data-sp="dragon"><input type="color" class="cl" data-k="horn">рожки</label><label data-sp="dragon"><input type="color" class="cl" data-k="spikes">шипы</label><label data-sp="dragon"><input type="color" class="cl" data-k="tail">хвост</label><label data-sp="dragon"><input type="color" class="cl" data-k="tailTip">пика хвоста</label>
+            <label data-sp="cat dog hamster rabbit"><input type="color" class="cl" data-k="muzzle">мордочка</label>
+            <label data-sp="bird"><input type="color" class="cl" data-k="head">голова</label>
+            <label data-sp="bird"><input type="color" class="cl" data-k="belly">брюшко</label>
+            <label><input type="color" class="cl" data-k="iris">левый глаз</label><label><input type="color" class="cl" data-k="iris2">правый глаз</label>
+            <label data-sp="cat dog hamster rabbit dragon"><input type="color" class="cl" data-k="pawFL">перед. левая</label><label data-sp="cat dog hamster rabbit dragon"><input type="color" class="cl" data-k="pawFR">перед. правая</label>
+            <label data-sp="cat dog hamster rabbit dragon"><input type="color" class="cl" data-k="pawHL">задняя левая</label><label data-sp="cat dog hamster rabbit dragon"><input type="color" class="cl" data-k="pawHR">задняя правая</label>
+            <label data-sp="cat dog hamster rabbit"><input type="color" class="cl" data-k="earIn">левое ухо</label><label data-sp="cat dog hamster rabbit"><input type="color" class="cl" data-k="earIn2">правое ухо</label>
+            <label data-sp="dog"><input type="color" class="cl" data-k="earC">висячие уши</label>
+            <label data-sp="rabbit"><input type="color" class="cl" data-k="ear">уши снаружи</label>
+            <label data-sp="cat dog hamster rabbit"><input type="color" class="cl" data-k="nose">нос</label>
+            <label data-sp="cat dog"><input type="color" class="cl" data-k="tail">хвост</label>
+            <label data-sp="rabbit"><input type="color" class="cl" data-k="tailC">помпон</label>
+            <label data-sp="cat"><input type="color" class="cl" data-k="hair">чёлка</label>
+            <label data-sp="kuzya"><input type="color" class="cl" data-k="hair">волосы</label><label data-sp="kuzya"><input type="color" class="cl" data-k="skin">кожа</label><label data-sp="kuzya"><input type="color" class="cl" data-k="pants">штаны</label><label data-sp="kuzya"><input type="color" class="cl" data-k="belt">поясок</label><label data-sp="kuzya"><input type="color" class="cl" data-k="lapti">лапти</label><label data-sp="kuzya"><input type="color" class="cl" data-k="dots">горошек</label>
+            <label data-sp="clippy"><input type="color" class="cl" data-k="bow">бантик</label>
+            <label data-sp="round"><input type="color" class="cl" data-k="limb">ручки-ножки</label><label data-sp="round"><input type="color" class="cl" data-k="shoe">ботинки</label><label data-sp="round"><input type="color" class="cl" data-k="pants">штаны</label><label data-sp="round"><input type="color" class="cl" data-k="earIn">уши внутри</label><label data-sp="round"><input type="color" class="cl" data-k="cheekC">щёчки</label>
+            <label data-sp="cat dog rabbit"><input type="color" class="cl" data-k="collar">ошейник</label>
+            <label data-sp="bird"><input type="color" class="cl" data-k="wing">крылья</label>
+            <label data-sp="bird"><input type="color" class="cl" data-k="prim">маховые</label>
+            <label data-sp="bird"><input type="color" class="cl" data-k="tail">хвост</label>
+            <label data-sp="bird"><input type="color" class="cl" data-k="cheek">щёчки</label>
+            <label data-sp="bird"><input type="color" class="cl" data-k="crestC">хохолок</label>
+            <label data-sp="bird"><input type="color" class="cl" data-k="face">маска</label>
+            <label data-sp="bird"><input type="color" class="cl" data-k="beak">клюв</label>
+            <label data-sp="bird"><input type="color" class="cl" data-k="feet">лапки</label>
+            <label data-sp="bird"><input type="color" class="cl" data-k="ring">ожерелье</label>
+            <label data-sp="bird"><input type="color" class="cl" data-k="patch">пятно на крыле</label>
+          </div></div>
+          <div><h4>Размеры</h4><div class="sl-grid">
+            <label data-sp="cat dog hamster rabbit">уши<input type="range" class="sl" data-k="earK" min="0.6" max="1.5" step="0.05"></label>
+            <label>глаза<input type="range" class="sl" data-k="eyeK" min="0.8" max="1.25" step="0.05"></label>
+            <label data-sp="cat dog rabbit bird dragon">хвост<input type="range" class="sl" data-k="tailK" min="0.6" max="1.5" step="0.05"></label>
+            <label data-sp="bird">клюв<input type="range" class="sl" data-k="beakK" min="0.7" max="1.5" step="0.05"></label>
+            <label data-sp="bird">хохолок<input type="range" class="sl" data-k="crestK" min="0.6" max="1.6" step="0.05"></label>
+            <label data-sp="hamster">щёчки<input type="range" class="sl" data-k="cheekK" min="0" max="1" step="0.05"></label>
+            <label data-sp="dragon">рожки<input type="range" class="sl" data-k="hornK" min="0.6" max="1.5" step="0.05"></label>
+            <label data-sp="dragon">крылья<input type="range" class="sl" data-k="wingK" min="0.7" max="1.4" step="0.05"></label>
+            <label data-sp="kuzya">копна<input type="range" class="sl" data-k="hairK" min="0.7" max="1.4" step="0.05"></label>
+            <label data-sp="clippy">брови<input type="range" class="sl" data-k="browK" min="0.5" max="2" step="0.05"></label>
+            <label data-sp="custom">размер<input type="range" class="sl" data-k="spriteK" min="0.5" max="1.6" step="0.05"></label>
+            <label data-sp="custom">шея<input type="range" class="sl" data-k="neck" min="0" max="0.8" step="0.02"></label>
+            <label data-sp="custom">ноги<input type="range" class="sl" data-k="legs" min="0" max="0.5" step="0.02"></label>
+            <label data-sp="custom">глаза (высота)<input type="range" class="sl" data-k="eyeY" min="0.3" max="1" step="0.02"></label>
+            <label data-sp="custom">глаза (разнос)<input type="range" class="sl" data-k="eyeDX" min="0" max="0.25" step="0.01"></label>
+            <label data-sp="cat dog hamster rabbit bird">пушистость<input type="range" class="sl" data-k="fluffK" min="0" max="1" step="0.05"></label>
+            <label>округлость<input type="range" class="sl" data-k="bodyK" min="0.9" max="1.15" step="0.01"></label>
+            <label>размер на экране<input type="range" class="sl" data-k="sizeK" min="0.6" max="1.6" step="0.05"></label>
+            <label data-sp="cat dog hamster rabbit">пятен<input type="range" class="sl" data-k="spotN" min="0" max="30" step="1"></label>
+            <label data-sp="cat dog hamster rabbit">размер пятен<input type="range" class="sl" data-k="spotK" min="0.5" max="2" step="0.05"></label>
+          </div></div>
+          <div><h4>Метки</h4><div class="chips">
+            <span class="chips" data-g="chest" data-sp="cat dog hamster rabbit"><button class="chip" data-v="on">грудка</button><button class="chip" data-v="none">без грудки</button></span>
+            <span class="chips" data-g="socks" data-sp="cat dog hamster rabbit"><button class="chip" data-v="true">носочки</button></span>
+            <span class="chips" data-g="patchSide" data-sp="cat dog hamster rabbit dragon"><button class="chip" data-v="l">пятно слева</button><button class="chip" data-v="r">пятно справа</button><button class="chip" data-v="both">оба</button><button class="chip" data-v="none">без пятна</button></span>
+            <span class="chips" data-g="blaze" data-sp="cat dog hamster rabbit"><button class="chip" data-v="true">проточина</button></span>
+            <span class="chips" data-g="mask" data-sp="cat dog rabbit"><button class="chip" data-v="light">светлая маска</button><button class="chip" data-v="dark">тёмная морда</button><button class="chip" data-v="points" data-sp="cat rabbit">сиамские отметины</button></span>
+            <span class="chips" data-g="monocle" data-sp="cat dog"><button class="chip" data-v="true">монокль</button></span>
+            <span class="chips" data-g="star" data-sp="cat dog hamster rabbit dragon"><button class="chip" data-v="true">звёздочка на лбу</button></span>
+            <span class="chips" data-g="heart" data-sp="cat dog hamster rabbit dragon"><button class="chip" data-v="true">сердечко на боку</button></span>
+            <span class="chips" data-g="greyMuzzle" data-sp="cat dog"><button class="chip" data-v="true">седая мордочка</button></span>
+            <span class="chips" data-g="tailTip" data-sp="cat dog"><button class="chip" data-v="true">светлый кончик хвоста</button></span>
+            <span class="chips" data-g="face" data-sp="bird"><button class="chip" data-v="true">светлая маска</button></span>
+            <span class="chips" data-g="bars" data-sp="bird"><button class="chip" data-v="true">полоски на крыльях</button></span>
+            <span class="chips" data-g="throat" data-sp="bird"><button class="chip" data-v="true">пятнышки на горле</button></span>
+            <span class="chips" data-g="ring" data-sp="bird"><button class="chip" data-v="true">ожерелье</button></span>
+          </div></div>
+          <div data-sp="cat dog hamster rabbit"><h4>Узор</h4><div class="chips"><span class="chips" data-g="pattern">
+            <button class="chip" data-v="">нет</button>
+            <button class="chip" data-v="stripe" data-sp="cat">полоски</button><button class="chip" data-v="bands" data-sp="cat">широкие полосы</button>
+            <button class="chip" data-v="rosettes" data-sp="cat">розетки</button><button class="chip" data-v="spots" data-sp="cat dog hamster rabbit">пятна</button>
+            <button class="chip" data-v="saddle" data-sp="dog">чепрак</button><button class="chip" data-v="beagle" data-sp="dog">седло бигля</button>
+            <button class="chip" data-v="dorsal" data-sp="hamster">полоска по спине</button><button class="chip" data-v="panda" data-sp="hamster">панда</button>
+            <button class="chip" data-v="dutch" data-sp="rabbit">голландский</button>
+          </span></div></div>
+          <div><h4>Особенности</h4><div class="chips">
+            <span class="chips" data-g="fluffy" data-sp="cat dog hamster rabbit bird"><button class="chip" data-v="true">пушистый</button></span>
+            <span class="chips" data-g="horns" data-sp="dragon"><button class="chip" data-v="true">рожки</button><button class="chip" data-v="false">без рожек</button></span>
+            <span class="chips" data-g="spikesOn" data-sp="dragon"><button class="chip" data-v="true">шипы</button><button class="chip" data-v="false">без шипов</button></span>
+            <span class="chips" data-g="fins" data-sp="dragon"><button class="chip" data-v="true">плавники-ушки</button><button class="chip" data-v="false">без плавников</button></span>
+            <span class="chips" data-g="tuft" data-sp="cat"><button class="chip" data-v="true">кисточки на ушах</button></span>
+            <span class="chips" data-g="fold" data-sp="cat"><button class="chip" data-v="true">сложенные уши</button></span>
+            <span class="chips" data-g="flat" data-sp="cat dog"><button class="chip" data-v="true">плоская мордочка</button></span>
+            <span class="chips" data-g="fluffyTail" data-sp="cat"><button class="chip" data-v="true">пушистый хвост</button></span>
+            <span class="chips" data-g="lashes" data-sp="cat rabbit"><button class="chip" data-v="true">реснички</button></span>
+            <span class="chips" data-g="sphynx" data-sp="cat"><button class="chip" data-v="true">сфинкс</button></span>
+            <span class="chips" data-g="hair" data-sp="cat"><button class="chip" data-v="true">чёлка</button></span>
+            <span class="chips" data-g="prick" data-sp="dog"><button class="chip" data-v="true">стоячие уши</button><button class="chip" data-v="false">висячие уши</button></span>
+            <span class="chips" data-g="ears" data-sp="cat dog dragon"><button class="chip" data-v="big">большие уши</button><button class="chip" data-v="small">маленькие уши</button></span>
+            <span class="chips" data-g="curlTail" data-sp="dog"><button class="chip" data-v="true">хвост колечком</button></span>
+            <span class="chips" data-g="wrinkles" data-sp="dog"><button class="chip" data-v="true">складочки</button></span>
+            <span class="chips" data-g="curly" data-sp="dog"><button class="chip" data-v="true">кудрявый</button></span>
+            <span class="chips" data-g="longBody" data-sp="dog"><button class="chip" data-v="true">длинное тело</button></span>
+            <span class="chips" data-g="smile" data-sp="cat dog"><button class="chip" data-v="true">улыбка</button></span>
+            <span class="chips" data-g="lop" data-sp="rabbit"><button class="chip" data-v="true">висячие уши</button><button class="chip" data-v="false">стоячие уши</button></span>
+            <span class="chips" data-g="collar" data-sp="cat dog rabbit"><button class="chip" data-v="on">ошейник</button><button class="chip" data-v="bow">бантик</button><button class="chip" data-v="none">без ошейника</button></span>
+            <span class="chips" data-g="crest" data-sp="bird"><button class="chip" data-v="true">хохолок</button></span>
+            <span class="chips" data-g="dotsOn" data-sp="kuzya"><button class="chip" data-v="true">в горошек</button><button class="chip" data-v="false">однотонная</button></span>
+            <span class="chips" data-g="freckles" data-sp="kuzya"><button class="chip" data-v="true">веснушки</button><button class="chip" data-v="false">без веснушек</button></span>
+            <span class="chips" data-g="beardOn" data-sp="kuzya"><button class="chip" data-v="true">борода</button></span>
+            <span class="chips" data-g="capOn" data-sp="kuzya"><button class="chip" data-v="true">картуз</button></span>
+            <span class="chips" data-g="glasses" data-sp="clippy round"><button class="chip" data-v="true">очки</button></span>
+            <span class="chips" data-g="ears2" data-sp="round"><button class="chip" data-v="long">длинные уши</button><button class="chip" data-v="round">круглые уши</button><button class="chip" data-v="pig">уши-треугольники</button><button class="chip" data-v="none">без ушей</button></span>
+            <span class="chips" data-g="teeth" data-sp="round"><button class="chip" data-v="true">зубки</button></span>
+            <span class="chips" data-g="lashes" data-sp="round"><button class="chip" data-v="true">реснички</button></span>
+            <span class="chips" data-g="hatP" data-sp="cat dog rabbit hamster kuzya round dragon"><button class="chip" data-v="musketeer">шляпа</button><button class="chip" data-v="party">колпак</button><button class="chip" data-v="propeller">пропеллер</button><button class="chip" data-v="santa">колпак Деда Мороза</button><button class="chip" data-v="">без шляпы</button></span>
+            <span class="chips" data-g="noWings" data-sp="dragon"><button class="chip" data-v="true">без крыльев</button></span>
+            <span class="chips" data-g="bowOn" data-sp="clippy"><button class="chip" data-v="true">бантик</button></span>
+          </div></div>
+        </div>
+      </div>`;
+    el.querySelectorAll('[data-sp]').forEach(n => { if (!n.dataset.sp.split(' ').includes(p.sp)) n.remove(); });
+    if (p.sp === 'custom') el.querySelectorAll('.cl, .sl[data-k="eyeK"], .sl[data-k="bodyK"]').forEach(i => i.closest('label').remove());   // sizeK остаётся   // у своего персонажа только размер, шея, ноги и глаза
+    el.querySelectorAll('.look > div').forEach(d => { if (!d.querySelector('input, .chip')) d.remove(); });   // пустые разделы конструктора
+    const frame = el.querySelector('iframe'), lk = el.querySelector('.look');
+    invoke('screens').then(r => { const ms = (r && r.monitors) || []; if (ms.length < 2) return; const sel = el.querySelector('.mon'); sel.innerHTML = ms.map((m, i) => `<option value="${i}">${i + 1}: ${m.w}×${m.h}</option>`).join(''); const cur = lookOf(p).mon; sel.value = typeof cur === 'number' ? String(cur) : '0'; el.querySelector('.mon-row').style.display = ''; sel.onchange = () => { const look = lookOf(p); look.mon = +sel.value; setLook(p, look); save(p, true); }; }).catch(() => {});
+    const refresh = () => {
+      const base = pal[p.color % pal.length];
+      const nm = el.querySelector('.nm'); nm.placeholder = base.name; if (document.activeElement !== nm) nm.value = p.name || '';
+      el.querySelector('.bt').textContent = p.build === 'chubby' ? 'пухляш' : 'обычный';
+      try { const a = JSON.parse(localStorage.getItem('ach:' + p.label) || 'null'), c = JSON.parse(localStorage.getItem('care:' + p.label) || 'null'); const got = a && a.got ? a.got : []; const ICO = { fed: '🍽', pet: '🤚', play: '🎾', butterfly: '🦋', shell: '🥚', pomo: '🍅', hide: '🙈', visit: '🚪', guest: '🛎', gift: '🎁', photo: '📷', days: '📅', perch: '🪟', cure: '💊' }; el.querySelector('.ach').textContent = '🏅 достижения: ' + got.length + (got.length ? ' ' + got.map(g => ICO[g.replace(/\d+$/, '')] || '🏅').join('') : '') + (c && typeof c.health === 'number' && c.health < 40 ? ' 🤒' : ''); } catch (_) { /* нет данных */ }
+      el.querySelectorAll('.sw').forEach((b, i) => b.classList.toggle('on', i === p.color % pal.length));
+      el.querySelectorAll('.seg button[data-b]').forEach(b => b.classList.toggle('on', b.dataset.b === (p.build || 'normal')));
+      el.querySelectorAll('.seg button[data-s]').forEach(b => b.classList.toggle('on', b.dataset.s === (p.sex || base.sex || 'm')));
+      el.querySelector('.fur').value = p.fur || base.fur;
+      el.querySelector('.reset').disabled = !p.fur;
+      const look = lookOf(p);
+      const fur = p.fur || base.fur, pawsD = look.paws || base.paws || base.chest || fur;
+      const dm = shade(fur, -.18);
+      const defs2 = { muzzle: base.muzzle || base.chest || fur, earC: base.earC || dm, ear: base.ear || fur, tailC: base.tailC || '#ffffff', hair: base.hair || shade(fur, -.45), collar: base.collar || '#e05a6a',
+        belly: base.belly || shade(fur, .3), head: base.head || fur, wing: base.wing || shade(fur, -.12), prim: base.prim || shade(fur, -.35), cheek: base.cheek || '#f08a3c', crestC: base.crest || base.head || fur,
+        horn: base.horn || '#f1e3c4', hair: base.hair || shade(fur, -.45), skin: base.skin || '#f6d3b0', pants: base.pants || '#4a3a5a', belt: base.belt || '#e9c34a', lapti: base.lapti || '#c9a15a', dots: base.dots && base.dots !== true ? base.dots : '#ffffff', bow: base.bow || '#ffffff', limb: base.limb || shade(fur, -.25), shoe: base.shoe || shade(fur, -.35), cheekC: base.cheekC && /^#/.test(base.cheekC) ? base.cheekC : '#ff7a8a', spikes: base.spikes && base.spikes !== 'none' ? base.spikes : shade(fur, -.4), wing: base.wing || shade(fur, -.3), tailTip: base.tailTip || base.spikes || shade(fur, -.4), face: base.face || '#f4f1ea', beak: base.beak || '#e0cd8f', feet: base.feet || '#8d8680', ring: base.ring || '#2a2220', patch: base.patch || '#f4f4f0' };
+      const defs = { ...defs2, chest: look.chest && look.chest !== 'none' && look.chest !== 'on' ? look.chest : (base.chest || fur), iris: base.iris, iris2: look.iris || base.iris, pawFL: pawsD, pawFR: pawsD, pawHL: pawsD, pawHR: pawsD, earIn: base.earIn || '#e8a5a0', earIn2: look.earIn || base.earIn || '#e8a5a0', nose: base.nose || '#e88c86', tail: base.tail || fur };
+      el.querySelectorAll('.cl').forEach(i => { const k = i.dataset.k, v = look[k] || defs[k]; i.value = /^#[0-9a-f]{6}$/i.test(v || '') ? v : '#cccccc'; });
+      el.querySelectorAll('.sl').forEach(i => { const k = i.dataset.k; i.value = look[k] !== undefined ? look[k] : (k === 'fluffK' ? (base.fluffy ? .9 : .4) : k === 'cheekK' ? 0 : k === 'spotN' ? (base.spotN !== undefined ? base.spotN : 9) : k === 'neck' ? .45 : k === 'legs' ? .15 : k === 'eyeY' ? .6 : k === 'eyeDX' ? .08 : k === 'sizeK' ? 1 : (base[k] || 1)); });
+      el.querySelectorAll('.chips').forEach(gr => { const g = gr.dataset.g;
+        let cur = look[g];
+        if (g === 'collar') cur = look.collar === 'none' ? 'none' : (look.bow || (look.bow === undefined && base.bow)) ? 'bow' : (look.collar || base.collar) ? 'on' : '';
+        else if (g === 'ears') cur = look.ears || (base.bigEars ? 'big' : base.smallEars ? 'small' : '');
+        else if (g === 'horns' || g === 'fins' || g === 'freckles') cur = look[g] !== undefined ? look[g] : base[g] !== false;
+        else if (g === 'dotsOn') cur = look.dots !== undefined ? look.dots !== 'none' : !!base.dots;
+        else if (g === 'beardOn') cur = look.beard !== undefined ? look.beard !== 'none' : !!base.beard;
+        else if (g === 'capOn') cur = look.cap !== undefined ? look.cap !== 'none' : !!base.cap;
+        else if (g === 'bowOn') cur = look.bow !== undefined ? look.bow !== 'none' : !!base.bow;
+        else if (g === 'spikesOn') cur = look.spikes !== undefined ? look.spikes !== 'none' : !!base.spikes;
+        else if (g === 'ears2') cur = look.ears2 !== undefined ? look.ears2 : (base.ears || 'none');
+        else if (g === 'hatP') cur = look.hatP !== undefined ? look.hatP : (base.hat || '');
+        else if (g === 'teeth') cur = look.teeth !== undefined ? look.teeth : !!base.teeth;
+        else if (cur === undefined) cur = g === 'chest' ? (base.chest ? 'on' : 'none') : g === 'pattern' ? (base.bands ? 'bands' : base.stripe && base.patches !== 'dorsal' ? 'stripe' : base.patches || '') : g === 'mask' ? (base.points ? 'points' : '') : g === 'patchSide' ? (base.patch && p.sp !== 'bird' ? (base.patchSide || 'l') : '') : (base[g] ? true : (g === 'prick' || g === 'lop') ? false : '');
+        if (g === 'chest' && cur !== 'none') cur = 'on'; if (g === 'patchSide' && look.patch === 'none') cur = 'none';
+        gr.querySelectorAll('.chip').forEach(b => b.classList.toggle('on', b.dataset.v === String(cur))); });
+      el.querySelector('.reset-look').disabled = !p.look;
+      const sprite = !!base.sprite;                                     // окрас-картинка: внешность не настраивается
+      for (const c of ['.tgl', '.rnd', '.reset-look', '.fur', '.reset']) el.querySelector(c).style.display = sprite ? 'none' : '';
+      if (sprite) lk.classList.remove('on');
+      if (p.sp === 'custom') { for (const c of ['.rnd']) el.querySelector(c).style.display = 'none'; el.querySelectorAll('.row').forEach(r => { const l = r.querySelector('.lbl'); if (l && /^(Окрас|Свой цвет)$/.test(l.textContent.trim())) r.style.display = 'none'; }); }
+      clearTimeout(frame._t); frame._t = setTimeout(() => { frame.src = previewSrc(p); }, frame.src ? 120 : 0);
+    };
+    const sws = el.querySelector('.sws');
+    pal.forEach((c, i) => {
+      const b = document.createElement('button');
+      b.className = 'sw'; b.title = c.breed ? c.name + ' — ' + c.breed : c.name; b.style.background = swatchBg(c);
+      b.onclick = () => { p.color = i; p.fur = ''; refresh(); save(p, true); };
+      sws.appendChild(b);
+    });
+    el.querySelector('.fur').addEventListener('input', e => { p.fur = e.target.value; refresh(); save(p); });
+    const nmi = el.querySelector('.nm');
+    nmi.addEventListener('input', () => { p.name = nmi.value.trim(); save(p); });
+    nmi.addEventListener('keydown', e => { if (e.key === 'Enter') nmi.blur(); });
+    el.querySelector('.reset').onclick = () => { p.fur = ''; refresh(); save(p, true); };
+    el.querySelectorAll('.seg button[data-b]').forEach(b => b.onclick = () => { p.build = b.dataset.b; refresh(); save(p, true); });
+    el.querySelectorAll('.seg button[data-s]').forEach(b => b.onclick = () => { p.sex = b.dataset.s; refresh(); save(p, true); });
+    // конструктор внешности
+    el.querySelector('.tgl').onclick = () => lk.classList.toggle('on');
+    el.querySelectorAll('.cl').forEach(i => i.addEventListener('input', () => { const look = lookOf(p); look[i.dataset.k] = i.value; if (i.dataset.k === 'chest') look.chestOn = true; setLook(p, look); refresh(); save(p); }));
+    el.querySelectorAll('.sl').forEach(i => i.addEventListener('input', () => { const look = lookOf(p); look[i.dataset.k] = +i.value; if ((i.dataset.k === 'spotN' || i.dataset.k === 'spotK') && look.pattern !== 'spots' && pal[p.color % pal.length].patches !== 'spots') look.pattern = 'spots'; setLook(p, look); refresh(); save(p); }));
+    el.querySelectorAll('.chips').forEach(gr => gr.querySelectorAll('.chip').forEach(b => b.onclick = () => {
+      const look = lookOf(p), g = gr.dataset.g, v = b.dataset.v, on = b.classList.contains('on'), base = pal[p.color % pal.length];
+      if (g === 'chest') { if (v === 'none') look.chest = 'none'; else look.chest = /^#/.test(look.chest || '') ? look.chest : 'on'; }
+      else if (g === 'patchSide') { if (v === 'none') { look.patch = 'none'; delete look.patchSide; } else { look.patchSide = v; if (!/^#/.test(look.patch || '')) look.patch = shade(p.fur || base.fur, -.5); } }
+      else if (g === 'pattern') look.pattern = v;
+      else if (g === 'mask') look.mask = on ? '' : v;
+      else if (g === 'hetero') { if (on) delete look.iris2; else look.iris2 = pick(['#5fb85a', '#6fa8e6', '#e0962a', '#8fb04a']); }
+      else if (g === 'ears') look.ears = on ? 'normal' : v;
+      else if (g === 'prick' || g === 'lop' || g === 'horns' || g === 'fins' || g === 'freckles') look[g] = v === 'true';
+      else if (g === 'ears2') look.ears2 = v;
+      else if (g === 'hatP') look.hatP = v;
+      else if (g === 'dotsOn') look.dots = v === 'true' ? (/^#/.test(look.dots || '') ? look.dots : '#ffffff') : 'none';
+      else if (g === 'beardOn') look.beard = on ? 'none' : (base.hair || '#a8a29a');
+      else if (g === 'capOn') look.cap = on ? 'none' : '#3a3a4a';
+      else if (g === 'bowOn') look.bow = on ? 'none' : (/^#/.test(look.bow || '') ? look.bow : '#ffffff');
+      else if (g === 'spikesOn') look.spikes = v === 'true' ? (base.spikes && base.spikes !== 'none' ? base.spikes : shade(p.fur || base.fur, -.4)) : 'none';
+      else if (g === 'collar') { if (v === 'none') { look.collar = 'none'; look.bow = false; } else { if (!/^#/.test(look.collar || '')) look.collar = base.collar || '#e05a6a'; look.bow = v === 'bow'; } }
+      else look[g] = !on;
+      setLook(p, look); refresh(); save(p, true);
+    }));
+    el.querySelector('.rnd').onclick = () => { setLook(p, randomLook(p)); lk.classList.add('on'); refresh(); save(p, true); };
+    el.querySelector('.reset-look').onclick = () => { p.look = ''; refresh(); save(p, true); };
+    const rm = el.querySelector('.rm');
+    rm.disabled = pets.length <= 1;
+    rm.onclick = () => invoke('pet_remove', { label: p.label });
+    el.onclick = () => select(p.label, false);
+    refresh();
+    return el;
+  }
+  function select(label, scroll) {
+    selected = label;
+    list.querySelectorAll('.pet').forEach(c => c.classList.toggle('sel', c.dataset.label === label));
+    const c = label && list.querySelector(`.pet[data-label="${label}"]`);
+    if (c && scroll) c.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+  async function load() {
+    try { pets = await invoke('pets_list'); } catch (e) { list.innerHTML = '<div class="empty">Не удалось получить список питомцев</div>'; return; }
+    list.innerHTML = '';
+    if (!pets.length) list.innerHTML = '<div class="empty">Пока никого нет — добавьте котика или щенка</div>';
+    for (const p of pets) list.appendChild(card(p));
+    document.querySelectorAll('.add button').forEach(b => { b.disabled = pets.length >= MAX; b.title = pets.length >= MAX ? `Больше ${MAX} питомцев нельзя — уберите кого-нибудь` : ''; });
+    const addBox = document.querySelector('.add'); let full = addBox.querySelector('.full'); if (!full) { full = document.createElement('div'); full.className = 'full'; full.style.cssText = 'color:var(--muted);font-size:12px;margin-top:6px'; addBox.appendChild(full); } full.textContent = pets.length >= MAX ? `Максимум ${MAX} питомцев — чтобы добавить нового, уберите кого-нибудь` : `Питомцев: ${pets.length} из ${MAX}`;
+    kidsRender();
+    select(selected, true);
+    if (typeof awayLoad === 'function') awayLoad();
+  }
+  document.querySelectorAll('.add button').forEach(b => { b.onclick = () => invoke('pet_add', { sp: b.dataset.sp }); });
+  document.getElementById('kid-go').onclick = () => {
+    const A = pets.find(p => p.label === document.getElementById('pa').value), B = pets.find(p => p.label === document.getElementById('pb').value), st = document.getElementById('kid-st');
+    if (!A || !B) return; if (A === B) { st.textContent = 'нужны два разных родителя'; return; }
+    if (A.sp !== B.sp) { st.textContent = 'малыш бывает только у одного вида'; return; }
+    if (sexOf(A) === sexOf(B)) { st.textContent = 'нужны мальчик и девочка'; return; }
+    const par = p => { const list = PALETTES[p.sp] || PALETTES.cat; return { sp: p.sp, color: p.color, fur: p.fur, sex: p.sex, look: lookOf(p), base: list[p.color % list.length] }; };
+    const kid = LOOKS.childLook(par(A), par(B)); if (!kid) { st.textContent = 'малыш бывает только у одного вида'; return; }
+    const names = ['Малыш', 'Кроха', 'Пушинка', 'Клякса', 'Бусинка', 'Тимка', 'Микки', 'Фунтик', 'Соня', 'Ириска'];
+    kid.look.parents = [A.label, B.label];   // малыш ходит за родителями
+    const pet = { sp: kid.sp, color: kid.color, fur: kid.fur, look: JSON.stringify(kid.look), name: pick(names), sex: Math.random() < .5 ? 'm' : 'f', build: 'normal', character: '', born: '', label: '' };
+    invoke('pet_add_custom', { pet }).then(() => { st.textContent = 'родил' + (pet.sex === 'f' ? 'ась ' : 'ся ') + pet.name + '!'; setTimeout(() => { st.textContent = ''; }, 4000); }).catch(e => { st.textContent = 'не получилось: ' + e; });
+  };
+  // перенос: питомцы + счётчики (достижения, уход, день рождения) в JSON в Документы/Котик и обратно
+  const exSt = document.getElementById('ex-st');
+  document.getElementById('ex-go').onclick = async () => {
+    try {
+      const store = {}; for (const p of pets) for (const k of ['ach', 'care', 'born']) { const v = localStorage.getItem(k + ':' + p.label); if (v) store[k + ':' + p.label] = v; }
+      const path = await invoke('export_pets', { json: JSON.stringify({ v: 1, at: new Date().toISOString(), pets, store }, null, 1) });
+      exSt.textContent = 'сохранено: ' + path;
+    } catch (e) { exSt.textContent = 'не сохранилось: ' + e; }
+  };
+  document.getElementById('im-file').addEventListener('change', async ev => {
+    const f = ev.target.files && ev.target.files[0]; if (!f) return;
+    try {
+      const d = JSON.parse(await f.text()); if (!d || !Array.isArray(d.pets)) throw new Error('это не файл Котика');
+      let n = 0;
+      for (const p of d.pets) {
+        if (pets.length + n >= MAX) break;
+        const before = (await invoke('pets_list')).map(q => q.label);
+        await invoke('pet_add_custom', { pet: { sp: p.sp, color: p.color || 0, fur: p.fur || '', look: p.look || '', name: p.name || '', sex: p.sex || '', build: p.build || 'normal', character: p.character || '', born: p.born || '', label: '' } });
+        const after = (await invoke('pets_list')).map(q => q.label), nl = after.find(l => !before.includes(l));
+        if (nl && d.store) for (const k of ['ach', 'care', 'born']) { const v = d.store[k + ':' + p.label]; if (v) try { localStorage.setItem(k + ':' + nl, v); } catch (_) { /* приватный режим */ } }
+        n++;
+      }
+      exSt.textContent = `загружено питомцев: ${n}`; ev.target.value = '';
+    } catch (e) { exSt.textContent = 'не загрузилось: ' + (e.message || e); }
+  });
+  // гости: переключатель, кто онлайн, подарки
+  const vsOn = document.getElementById('vs-on'), vsMe = document.getElementById('vs-me'), vsPeers = document.getElementById('vs-peers');
+  let meId = null;
+  vsOn.onchange = () => invoke('visits_set', { on: vsOn.checked }).catch(() => {});
+  async function peersLoad() {
+    if (!NET) return;
+    try {
+      const me = await invoke('whoami'); meId = me.client; vsOn.checked = me.visits !== false; vsMe.textContent = `вы: ${me.user}@${me.host}`;
+      const r = await fetch(NET + '/online', { cache: 'no-store' }); if (!r.ok) throw new Error(r.status);
+      const all = await r.json(), peers = all.filter(p => p.client !== meId && p.online), mine = all.find(p => p.client === meId);
+      const status = c => { const s = c.status || {}, parts = [];
+        for (const a of (s.away || [])) parts.push(`🚪 ${esc(a.pet)} в гостях у ${esc(a.to)}`);
+        if (s.guest) parts.push(`🛎 гостит ${esc(s.guest.pet)} от ${esc(s.guest.owner)}`);
+        if (s.text) parts.unshift(`💬 ${esc(s.text)}`);
+        return parts.length ? '<span class="st-away">' + parts.join(', ') + '</span>' : '<span class="st-home">● дома</span>'; };
+      vsMe.textContent = `вы: ${me.user}@${me.host}` + (mine ? ` · ${mine.status && ((mine.status.away || []).length || mine.status.guest) ? status(mine).replace(/<[^>]+>/g, '') : 'дома'}` : '');
+      if (!peers.length) vsPeers.innerHTML = '<div class="card" style="color:var(--muted)">сейчас никого нет онлайн</div>';
+      else vsPeers.innerHTML = '<table class="tbl"><thead><tr><th>Кто</th><th>Питомцы</th><th>Сейчас</th><th></th></tr></thead><tbody>' + peers.map(p => `<tr>
+          <td><b>${esc(p.name)}</b>${p.version ? ` <span style="color:var(--muted);font-size:11px">v${esc(p.version)}</span>` : ''}${p.visits ? '' : '<div style="color:var(--muted);font-size:11px">гостей не принимает</div>'}</td>
+          <td>${(p.pets || []).map(q => `<span class="pp-row"><img class="pp" data-sp="${esc(q.sp || 'cat')}" data-c="${+q.color || 0}" alt="" width="34" height="28" title="${esc(SPN[q.sp] || q.sp || '')}"><span>${SPICO[q.sp] || '🐾'} ${esc(q.name)} <span style="color:var(--muted);font-size:11px">${esc((SPN[q.sp] || q.sp || '').toLowerCase())}${q.act ? ' · ' + esc(q.act) : ''}</span></span></span>`).join('') || '<span style="color:var(--muted)">без питомцев</span>'}</td>
+          <td>${status(p)}</td>
+          <td style="white-space:nowrap">${['wave:👋', 'like:❤'].map(g => { const [w, ico] = g.split(':'); return `<button class="link gift" data-to="${p.client}" data-what="${w}" title="${w === 'wave' ? 'помахать' : 'лайкнуть'}">${ico}</button>`; }).join('')}</td></tr>`).join('') + '</tbody></table>';
+      peersNow = peers; sendFill();
+      vsPeers.querySelectorAll('.gift').forEach(b => b.onclick = async () => {
+        const what = b.dataset.what; b.disabled = true;
+        const body = what === 'wave' ? { from: meId, to: b.dataset.to, kind: 'wave', payload: {} } : what === 'like' ? { from: meId, to: b.dataset.to, kind: 'like', payload: { pet: { name: (peers.find(p => p.client === b.dataset.to) || { pets: [] }).pets.map(q => q.name)[0] || '' } } } : { from: meId, to: b.dataset.to, kind: 'gift', payload: { what } };
+        try { await fetch(NET + '/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); b.textContent = '✓'; } catch (_) { b.textContent = '✗'; }
+        setTimeout(() => { b.disabled = false; peersLoad(); }, 4000);
+      });
+      const f = await fetch(NET + '/feed?limit=25', { cache: 'no-store' }); if (f.ok) { const feed = await f.json(), ICO = { visit: '🚪', return: '🏠', gift: '🎁', wave: '👋', like: '❤', badge: '🏅', newpet: '🐣', race: '🏁', selfie: '📸', mouse: '🐭', disco: '🪩', bday: '🎂', obday: '🎉' };
+        document.getElementById('vs-feed').innerHTML = feed.length ? feed.map(e => `<div><span class="t">${esc(e.at)}</span>${ICO[e.kind] || '•'} ${esc(e.text)}</div>`).join('') : '<div style="color:var(--muted)">пока тихо</div>'; }
+    } catch (_) { vsPeers.textContent = 'портал недоступен'; }
+  }
+  // Блок «отправить»: адресат — из тех, кто сейчас онлайн; питомец — свой; подарок — из каталога.
+  let peersNow = [];
+  const petName = q => q.name || (((PALETTES[q.sp] || PALETTES.cat)[q.color % (PALETTES[q.sp] || PALETTES.cat).length] || {}).name) || q.label;
+  function sendFill() {
+    const box = document.getElementById('vs-send'), to = document.getElementById('vs-to'), pet = document.getElementById('vs-pet'), gift = document.getElementById('vs-gift');
+    box.style.display = peersNow.length ? '' : 'none'; if (!peersNow.length) return;
+    const keepTo = to.value, keepPet = pet.value, keepGift = gift.value;
+    to.innerHTML = peersNow.map(p => `<option value="${p.client}">${esc(p.name)}${(p.pets || []).length ? ' (' + (p.pets || []).map(q => esc(q.name)).join(', ') + ')' : ''}</option>`).join('');
+    if (peersNow.some(p => p.client === keepTo)) to.value = keepTo;
+    pet.innerHTML = pets.map(q => `<option value="${q.label}">${esc(petName(q))}</option>`).join('');
+    if (pets.some(q => q.label === keepPet)) pet.value = keepPet;
+    if (!gift.options.length) gift.innerHTML = Object.entries(window.GIFTS || {}).map(([k, g]) => `<option value="${k}">${g.ico} ${esc(g.name)}</option>`).join('');
+    if (keepGift) gift.value = keepGift;
+    sendNote();
+  }
+  function sendNote() { const p = peersNow.find(q => q.client === document.getElementById('vs-to').value); document.getElementById('vs-to-note').textContent = p ? (p.visits ? '' : 'гостей не принимает') : ''; document.getElementById('vs-visit-go').disabled = !(p && p.visits); document.getElementById('vs-note-go').disabled = !(p && p.visits); }
+  document.getElementById('vs-to').onchange = sendNote;
+  document.getElementById('vs-visit-go').onclick = () => {
+    const p = peersNow.find(q => q.client === document.getElementById('vs-to').value), label = document.getElementById('vs-pet').value, st = document.getElementById('vs-visit-st');
+    if (!p || !label) return; if (!p.visits) { st.textContent = 'этот коллега гостей не принимает'; return; }
+    invoke('pet_visit', { label, to: p.client, name: p.name }).then(() => { st.textContent = `отправляю к ${p.name}…`; setTimeout(awayLoad, 3000); setTimeout(() => { st.textContent = ''; }, 6000); }).catch(e => { st.textContent = 'не получилось: ' + e; });
+  };
+  document.getElementById('vs-note-go').onclick = () => {
+    const p = peersNow.find(q => q.client === document.getElementById('vs-to').value), label = document.getElementById('vs-pet').value, st = document.getElementById('vs-visit-st'), msgEl = document.getElementById('gift-msg'), msg = msgEl.value.trim().slice(0, 120);
+    if (!p || !label) return; if (!p.visits) { st.textContent = 'этот коллега гостей не принимает'; return; } if (!msg) { st.textContent = 'напишите, что передать, в поле подписи'; msgEl.focus(); return; }
+    invoke('pet_visit', { label, to: p.client, name: p.name, msg }).then(() => { st.textContent = `несу записку к ${p.name}…`; msgEl.value = ''; setTimeout(awayLoad, 3000); setTimeout(() => { st.textContent = ''; }, 6000); }).catch(e => { st.textContent = 'не получилось: ' + e; });
+  };
+  document.getElementById('vs-gift-go').onclick = async () => {
+    const p = peersNow.find(q => q.client === document.getElementById('vs-to').value), what = document.getElementById('vs-gift').value, G = (window.GIFTS || {})[what] || {}, msgEl = document.getElementById('gift-msg'), msg = msgEl.value.trim().slice(0, 80), st = document.getElementById('vs-gift-st'), b = document.getElementById('vs-gift-go');
+    if (!p) return; b.disabled = true; st.textContent = 'отправляю…';
+    try { const r = await fetch(NET + '/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from: meId, to: p.client, kind: 'gift', payload: { what, msg } }) }); if (!r.ok) throw new Error(String(r.status));
+      st.textContent = `${G.ico || '🎁'} ${G.name || 'подарок'} — ${p.name}: отправлено`; msgEl.value = ''; if (T && T.event) T.event.emit('gift-sent', { to: p.name, name: G.name || 'подарок', ico: G.ico || '🎁', what, msg }).catch(() => {}); }
+    catch (e) { st.textContent = 'не ушло: ' + e.message; }
+    setTimeout(() => { b.disabled = false; st.textContent = ''; peersLoad(); }, 5000);
+  };
+  // напоминания — localStorage reminders; старший питомец сам их снимает, когда скажет
+  const remAt = document.getElementById('rem-at'), remText = document.getElementById('rem-text'), remList = document.getElementById('rem-list');
+  const remLoad = () => { let l = []; try { l = JSON.parse(localStorage.getItem('reminders') || '[]'); } catch (_) { /* без памяти */ } return l; };
+  const remSave = l => { try { localStorage.setItem('reminders', JSON.stringify(l)); } catch (_) { /* без памяти */ } remShow(); };
+  function remShow() { const l = remLoad(); remList.innerHTML = l.length ? l.map(r => `<div>${esc(r.at)} — ${esc(r.text)} <button class="link rem-del" data-id="${r.id}">убрать</button></div>`).join('') : 'пока ничего'; remList.querySelectorAll('.rem-del').forEach(b => b.onclick = () => remSave(remLoad().filter(r => String(r.id) !== b.dataset.id))); }
+  function remAdd(at) { const text = remText.value.trim().slice(0, 80); if (!at || !text) { remText.focus(); return; } const l = remLoad(); l.push({ id: Date.now(), at, text, day: new Date().toISOString().slice(0, 10) }); l.sort((a, b) => a.at.localeCompare(b.at)); remSave(l); remText.value = ''; }
+  const hm = d => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  document.getElementById('rem-add').onclick = () => remAdd(remAt.value);
+  document.getElementById('rem-15').onclick = () => remAdd(hm(new Date(Date.now() + 15 * 60000)));
+  document.getElementById('rem-60').onclick = () => remAdd(hm(new Date(Date.now() + 60 * 60000)));
+  remShow(); setInterval(remShow, 15000);
+  const ob = document.getElementById('owner-bday'); try { ob.value = localStorage.getItem('owner:bday') || ''; } catch (_) { /* без памяти */ }
+  ob.onchange = () => { const v = ob.value.trim(); if (v && !/^\d{2}\.\d{2}$/.test(v)) { ob.value = ''; return; } try { if (v) localStorage.setItem('owner:bday', v); else localStorage.removeItem('owner:bday'); } catch (_) { /* без памяти */ } };
+  // статус хозяина — localStorage mood + событие mood питомцам
+  const moodSel = document.getElementById('mood'), moodText = document.getElementById('mood-text');
+  { let m = ''; try { m = localStorage.getItem('mood') || ''; } catch (_) { /* без памяти */ } if (m && [...moodSel.options].some(o => o.value === m || o.textContent === m)) moodSel.value = m; else if (m) { moodSel.value = 'custom'; moodText.style.display = ''; moodText.value = m; } }
+  const moodApply = () => { const v = moodSel.value === 'custom' ? moodText.value.trim().slice(0, 24) : moodSel.value; moodText.style.display = moodSel.value === 'custom' ? '' : 'none'; try { if (v) localStorage.setItem('mood', v); else localStorage.removeItem('mood'); } catch (_) { /* без памяти */ } if (T && T.event) T.event.emit('mood', v).catch(() => {}); };
+  moodSel.onchange = moodApply; moodText.onchange = moodApply;
+  // тихие часы — localStorage quiet:from / quiet:to, питомцы читают сами
+  const qF = document.getElementById('q-from'), qT = document.getElementById('q-to'), qSt = document.getElementById('q-st');
+  try { qF.value = localStorage.getItem('quiet:from') || ''; qT.value = localStorage.getItem('quiet:to') || ''; } catch (_) { /* без памяти */ }
+  const qShow = () => { qSt.textContent = qF.value && qT.value ? `тихо с ${qF.value} до ${qT.value}` : 'не заданы'; }; qShow();
+  document.getElementById('q-save').onclick = () => { if (!qF.value || !qT.value) { qSt.textContent = 'укажите оба времени'; return; } try { localStorage.setItem('quiet:from', qF.value); localStorage.setItem('quiet:to', qT.value); } catch (_) { /* без памяти */ } qShow(); };
+  document.getElementById('q-clear').onclick = () => { qF.value = qT.value = ''; try { localStorage.removeItem('quiet:from'); localStorage.removeItem('quiet:to'); } catch (_) { /* без памяти */ } qShow(); };
+  // задания дня — запись quests:<день>, которую ведёт старший питомец; серия — quest:streak
+  function questsShow() {
+    const day = new Date().toISOString().slice(0, 10); let q = null, st = null;
+    try { q = JSON.parse(localStorage.getItem('quests:' + day) || 'null'); st = JSON.parse(localStorage.getItem('quest:streak') || 'null'); } catch (_) { /* без памяти */ }
+    const el = document.getElementById('quests');
+    if (!q) { el.textContent = 'задания выдаются через минуту после запуска'; return; }
+    el.innerHTML = q.items.map(i => `<div>${i.done ? '✅' : '⬜'} ${esc(i.title)}</div>`).join('') + `<div style="margin-top:4px">${q.allDone ? '🎉 всё сделано! ' : ''}серия дней: ${st && st.n ? st.n : 0}</div>`;
+    try { const ps = JSON.parse(localStorage.getItem('pairq:streak') || 'null'); const el = document.getElementById('pairq'); if (el) el.textContent = ps && ps.n ? `Парные задания (с другом по сети): серия ${ps.n} дн.` : ''; } catch (_) { /* без памяти */ }
+  }
+  questsShow(); setInterval(questsShow, 15000);
+  // друзья и соперники — из localStorage rel:<a>|<b>
+  function relsShow() {
+    for (const p of pets) {
+      const el = document.querySelector(`.pet[data-label="${p.label}"] .rel`); if (!el) continue;
+      const fr = [], rv = [], rvL = [];
+      for (const q of pets) { if (q.label === p.label) continue; let v = 0; try { v = +localStorage.getItem('rel:' + [p.label, q.label].sort().join('|')) || 0; } catch (_) { /* без памяти */ } if (v >= 6) fr.push(petName(q)); else if (v <= -3) { rv.push(petName(q)); rvL.push(q.label); } }
+      let best = null; try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (!k || !k.startsWith('nrel:' + p.label + '|')) continue; const v = +localStorage.getItem(k) || 0, parts = k.slice(5).split('|'); if (v >= 4 && (!best || v > best.v)) best = { v, owner: parts[1], name: parts.slice(2).join('|') }; } } catch (_) { /* без памяти */ }
+      const nb = best ? `💙 друг по сети: ${best.name} (${best.owner})` : '';
+      el.textContent = [fr.length ? '💛 друзья: ' + fr.join(', ') : '', rv.length ? '⚡ не ладит: ' + rv.join(', ') : '', nb].filter(Boolean).join(' · ');
+      if (rv.length) { const b = document.createElement('button'); b.className = 'link peace-go'; b.textContent = 'помирить'; b.title = 'питомец подойдёт мириться носом к носу'; b.dataset.with = rvL[0]; el.appendChild(document.createTextNode(' ')); el.appendChild(b); }
+    }
+  }
+  // «Отношения»: все пары своих питомцев со счётом и друзья по сети каждого
+  function relsTable() {
+    const el = document.getElementById('rels'); if (!el) return;
+    const rows = [], get = k => { try { return +localStorage.getItem(k) || 0; } catch (_) { return 0; } };
+    for (let i = 0; i < pets.length; i++) for (let j = i + 1; j < pets.length; j++) {
+      const a = pets[i], b = pets[j], v = get('rel:' + [a.label, b.label].sort().join('|'));
+      rows.push(`<div style="padding:3px 0"><b>${esc(petName(a))}</b> и <b>${esc(petName(b))}</b>: ${v >= 6 ? '💛 друзья' : v <= -3 ? '⚡ не ладят' : v > 0 ? '🙂 приятели' : v < 0 ? '😐 прохладно' : '— пока не знакомы'} <span style="color:var(--muted);font-size:11px">(${v > 0 ? '+' : ''}${v})</span></div>`);
+    }
+    for (const p of pets) {
+      const nf = []; try { for (let k = 0; k < localStorage.length; k++) { const key = localStorage.key(k); if (!key || !key.startsWith('nrel:' + p.label + '|')) continue; const parts = key.slice(5).split('|'), v = +localStorage.getItem(key) || 0; if (v >= 4) nf.push(`${esc(parts.slice(2).join('|'))} <span style="color:var(--muted);font-size:11px">(${esc(parts[1])}, +${v})</span>`); } } catch (_) { /* без памяти */ }
+      if (nf.length) rows.push(`<div style="padding:3px 0"><b>${esc(petName(p))}</b> дружит по сети: 💙 ${nf.join(', ')}</div>`);
+    }
+    if (rows.length) { el.style.color = ''; el.innerHTML = rows.join(''); }
+  }
+  setInterval(relsShow, 10000); setTimeout(relsShow, 1500); setInterval(relsTable, 10000); setTimeout(relsTable, 1600);
+  // Портреты питомцев коллег: скрытый iframe с index.html в демо-режиме рисует питомца нужного вида и окраса,
+  // кадр снимается в картинку и кэшируется по «вид|окрас»; по одному за раз, чтобы не грузить окно.
+  const portraits = new Map(); let ppFrame = null, ppBusy = false; const ppQueue = [];
+  function portrait(sp, c) {
+    const key = sp + '|' + c; if (portraits.has(key)) return Promise.resolve(portraits.get(key));
+    return new Promise(res => { ppQueue.push({ sp, c, res }); ppNext(); });
+  }
+  function ppNext() {
+    if (ppBusy || !ppQueue.length) return; ppBusy = true; const job = ppQueue.shift(), key = job.sp + '|' + job.c;
+    if (portraits.has(key)) { job.res(portraits.get(key)); ppBusy = false; return ppNext(); }
+    if (!ppFrame) { ppFrame = document.createElement('iframe'); ppFrame.style.cssText = 'position:fixed;left:-500px;top:-500px;width:220px;height:180px;border:0;opacity:0;pointer-events:none'; document.body.appendChild(ppFrame); }
+    const done = url => { if (url) portraits.set(key, url); job.res(url || ''); ppBusy = false; setTimeout(ppNext, 50); };
+    let tries = 0; const snap = () => {
+      try {
+        const cv = ppFrame.contentDocument && ppFrame.contentDocument.querySelector('canvas');
+        if (cv && cv.width) { const out = document.createElement('canvas'); out.width = 68; out.height = 56; const g = out.getContext('2d'); g.drawImage(cv, 0, 0, cv.width, cv.height, 0, 0, 68, 56); return done(out.toDataURL('image/png')); }
+      } catch (_) { /* кадр ещё не готов */ }
+      if (++tries < 12) setTimeout(snap, 150); else done('');
+    };
+    ppFrame.src = 'index.html?pp=' + Date.now() + '#' + new URLSearchParams({ demo: 1, sp: job.sp, c: job.c, pose: 'sit' }).toString();
+    setTimeout(snap, 450);
+  }
+  function portraitsFill() { document.querySelectorAll('img.pp:not([src])').forEach(img => portrait(img.dataset.sp, +img.dataset.c || 0).then(u => { if (u) img.src = u; })); }
+  new MutationObserver(() => portraitsFill()).observe(document.getElementById('vs-peers'), { childList: true, subtree: true });
+  // журнал записок (notes в localStorage, пишет старший питомец при визите с сообщением); непрочитанные — счётчик на вкладке «Сеть»
+  function notesShow() {
+    let list = [], seen = 0; try { list = JSON.parse(localStorage.getItem('notes') || '[]'); seen = +localStorage.getItem('notes:seen') || 0; } catch (_) { /* без памяти */ }
+    const el = document.getElementById('notes'); if (!el) return;
+    if (list.length) { el.style.color = ''; el.innerHTML = list.map(n => `<div style="padding:4px 0;border-bottom:1px solid var(--line)"><span style="color:var(--muted);font-size:11.5px">${esc(new Date(n.at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }))}</span> <b>${esc(n.from)}</b>${n.pet ? ' <span style="color:var(--muted)">(' + esc(n.pet) + ')</span>' : ''}: ${esc(n.text)}${n.at > seen ? ' <span style="color:var(--accent);font-size:11px">новое</span>' : ''}</div>`).join(''); }
+    const unread = list.filter(n => n.at > seen).length, tab = document.querySelector('.tab[data-tab="net"]'); if (tab) tab.textContent = '🌐 Сеть' + (unread ? ` (${unread})` : '');
+  }
+  setInterval(notesShow, 10000); setTimeout(notesShow, 600);
+  document.getElementById('notes-clear').onclick = () => { try { localStorage.removeItem('notes'); } catch (_) { /* без памяти */ } const el = document.getElementById('notes'); el.style.color = 'var(--muted)'; el.textContent = 'пусто'; notesShow(); };
+  if (T && T.event) T.event.listen('notes-changed', notesShow);
+  function giftsShow() {
+    let list = []; try { list = JSON.parse(localStorage.getItem('gifts') || '[]'); } catch (_) { /* без памяти */ }
+    const el = document.getElementById('gifts'); if (!el) return;
+    if (!list.length) return;
+    el.style.color = ''; el.innerHTML = list.map(g => { const G = (window.GIFTS || {})[g.what] || {}; return `<div style="padding:4px 0;border-bottom:1px solid var(--line)"><span style="color:var(--muted);font-size:11.5px">${esc(new Date(g.at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }))}</span> ${g.dir === 'out' ? '→ <b>' + esc(g.who) + '</b>: ' : '<b>' + esc(g.who) + '</b> → вам: '}${esc(G.ico || '🎁')} ${esc(G.name || g.what || 'подарок')}${g.msg ? ' <span style="color:var(--muted)">«' + esc(g.msg) + '»</span>' : ''}</div>`; }).join('');
+  }
+  setInterval(giftsShow, 10000); setTimeout(giftsShow, 700);
+  document.getElementById('gifts-clear').onclick = () => { try { localStorage.removeItem('gifts'); } catch (_) { /* без памяти */ } const el = document.getElementById('gifts'); el.style.color = 'var(--muted)'; el.textContent = 'пусто'; };
+  if (T && T.event) T.event.listen('gifts-changed', giftsShow);
+  document.addEventListener('click', e => { const b = e.target.closest('.peace-go'); if (!b) return; const card = b.closest('.pet'); if (!card) return; b.disabled = true; b.textContent = 'идёт мириться…'; if (T && T.event) T.event.emit('rel-peace', { a: card.dataset.label, b: b.dataset.with }).catch(() => {}); setTimeout(relsShow, 6000); });
+  // микроопрос всем, кто онлайн
+  document.getElementById('poll-go').onclick = async () => {
+    const text = document.getElementById('poll-text').value.trim().slice(0, 80), options = ['poll-o1', 'poll-o2', 'poll-o3'].map(i => document.getElementById(i).value.trim().slice(0, 20)).filter(Boolean), st = document.getElementById('poll-st'), b = document.getElementById('poll-go');
+    if (!text || options.length < 2) { st.textContent = 'нужен вопрос и два варианта'; return; }
+    b.disabled = true; st.textContent = 'спрашиваю…';
+    try { const r = await fetch(NET + '/poll', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from: meId, text, options }) }); const j = await r.json(); if (!r.ok) throw new Error(j.message || r.status);
+      st.textContent = `спросили ${j.asked} чел.`; if (T && T.event) T.event.emit('poll-created', { id: j.id, text }).catch(() => {}); document.getElementById('poll-text').value = ''; }
+    catch (e) { st.textContent = 'не вышло: ' + e.message; }
+    setTimeout(() => { b.disabled = false; }, 5000);
+  };
+  const albumOn = document.getElementById('album-on'); try { albumOn.checked = localStorage.getItem('album:off') !== '1'; } catch (_) { albumOn.checked = true; }
+  albumOn.onchange = () => { try { localStorage.setItem('album:off', albumOn.checked ? '0' : '1'); } catch (_) { /* без памяти */ } };
+  // карточка «год с питомцем» — рисует само окно питомца, ответ card-done
+  document.addEventListener('click', e => { const b = e.target.closest('.card-go'); if (!b) return; const card = b.closest('.pet'); if (!card) return; b.disabled = true; b.textContent = 'рисую…'; if (T && T.event) T.event.emit('card-req', { label: card.dataset.label }).catch(() => {}); setTimeout(() => { b.disabled = false; b.textContent = 'карточка'; }, 6000); });
+  if (T && T.event) T.event.listen('card-done', e => { const q = e.payload || {}; const card = document.querySelector(`.pet[data-label="${q.label}"] .card-go`); if (card) card.title = q.path ? 'сохранено: ' + q.path : 'не получилось: ' + (q.error || ''); if (q.path) { const st = document.getElementById('ex-st'); if (st) { st.textContent = 'карточка: ' + q.path; setTimeout(() => { st.textContent = ''; }, 8000); } } });
+  // домик — флаг bed:house, лежанка читает его сама
+  const bedHouse = document.getElementById('bed-house'); try { bedHouse.checked = localStorage.getItem('bed:house') === '1'; } catch (_) { /* без памяти */ }
+  bedHouse.onchange = () => { try { localStorage.setItem('bed:house', bedHouse.checked ? '1' : '0'); } catch (_) { /* без памяти */ } };
+  document.getElementById('vs-page').onclick = ev => { ev.preventDefault(); invoke('open_url', { url: ED.site + 'social.html' }).catch(() => {}); };
+  peersLoad(); setInterval(peersLoad, 30000);
+  // кто сейчас в гостях (метки away:<label> пишет сам питомец) и кнопка «вернуть всех»
+  const vsAway = document.getElementById('vs-away');
+  function awayLoad() {
+    const rows = [];
+    for (const p of pets) { try { const a = JSON.parse(localStorage.getItem('away:' + p.label) || 'null'); if (a) rows.push(`<b>${esc(a.name || p.name || p.label)}</b> → у ${esc(a.to)}, вернётся через ${Math.max(0, Math.ceil((a.until - Date.now()) / 60000))} мин`); } catch (_) { /* нет данных */ } }
+    vsAway.innerHTML = (rows.length ? 'в гостях: ' + rows.join('; ') + ' ' : 'никто не в гостях ') + '<button class="link" id="vs-recall">вернуть всех</button>';
+    vsAway.querySelector('#vs-recall').onclick = () => invoke('pets_recall').then(() => { for (const p of pets) try { localStorage.removeItem('away:' + p.label); } catch (_) {} try { localStorage.removeItem('awayUntil'); } catch (_) {} awayLoad(); }).catch(() => {});
+  }
+  awayLoad(); setInterval(awayLoad, 10000);
+  // свой персонаж: файл → портал вырезает фон → PNG в look.spriteData → новый питомец вида custom
+  const csFile = document.getElementById('cs-file'), csName = document.getElementById('cs-name'), csSt = document.getElementById('cs-st');
+  // без портала: картинку как есть, уменьшенную до 512 px по большей стороне (look хранится в конфиге целиком)
+  const fitSprite = f => new Promise((ok, no) => {
+    const img = new Image(), url = URL.createObjectURL(f);
+    img.onload = () => { const k = Math.min(1, 512 / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); c.toBlob(b => b ? ok(b) : no(new Error('не читается')), 'image/png'); };
+    img.onerror = () => { URL.revokeObjectURL(url); no(new Error('не картинка')); }; img.src = url;
+  });
+  if (!NET) { document.getElementById('cs-go').textContent = 'добавить'; const hint = document.getElementById('cs-go').parentElement.querySelector('div'); if (hint) hint.textContent = 'PNG с прозрачным фоном: персонаж будет ходить как есть. Фон у фотографии заранее уберите в любом редакторе.'; }
+  document.getElementById('cs-go').onclick = async () => {
+    const f = csFile.files && csFile.files[0]; if (!f) { csSt.textContent = 'выберите картинку'; return; }
+    if (pets.length >= MAX) { csSt.textContent = 'мест нет — уберите кого-нибудь'; return; }
+    csSt.textContent = NET ? 'вырезаю фон…' : 'добавляю…';
+    try {
+      let blob;
+      if (NET) {
+        const r = await fetch(NET + '/cutout', { method: 'POST', headers: { 'Content-Type': f.type || 'image/png' }, body: f });
+        if (!r.ok) { let m = ''; try { m = (await r.json()).message; } catch (_) {} throw new Error(m || ('портал ответил ' + r.status)); }
+        blob = await r.blob();
+      } else blob = await fitSprite(f);   // общий выпуск: фон не вырезаем — картинка берётся как есть (PNG с прозрачностью)
+      const data = await new Promise((ok, no) => { const rd = new FileReader(); rd.onload = () => ok(rd.result); rd.onerror = no; rd.readAsDataURL(blob); });
+      const look = { spriteData: data, spriteK: 1, neck: .45, legs: .15 };
+      const pet = { sp: 'custom', color: 0, fur: '', look: JSON.stringify(look), name: csName.value.trim() || f.name.replace(/\.[^.]+$/, '').slice(0, 24), sex: 'm', build: 'normal', character: '', born: '', label: '' };
+      await invoke('pet_add_custom', { pet });
+      csSt.textContent = 'готово: ' + pet.name + ' на экране'; csFile.value = ''; csName.value = '';
+    } catch (e) { csSt.textContent = 'не вышло: ' + (e.message || e); }
+    setTimeout(() => { csSt.textContent = ''; }, 8000);
+  };
+  const cal = document.getElementById('cal'), calSt = document.getElementById('cal-st');
+  invoke('calendar_get').then(u => { cal.value = u || ''; }).catch(() => {});
+  const cdU = document.getElementById('cd-user'), cdP = document.getElementById('cd-pass'), cdSt = document.getElementById('cd-st');
+  invoke('caldav_get').then(c => { cdU.value = (c && c.user) || ''; cdP.placeholder = c && c.has_pass ? 'пароль сохранён' : 'пароль приложения'; }).catch(() => {});
+  document.getElementById('cd-save').onclick = () => invoke('caldav_set', { user: cdU.value.trim(), pass: cdP.value }).then(() => { cdP.value = ''; cdSt.textContent = cdU.value.trim() ? 'сохранено' : 'CalDAV отключён'; cdP.placeholder = cdU.value.trim() ? 'пароль сохранён' : 'пароль приложения'; setTimeout(() => { cdSt.textContent = ''; }, 3000); }).catch(e => { cdSt.textContent = 'не сохранилось: ' + e; });
+  document.getElementById('cd-test').onclick = () => { cdSt.textContent = 'проверяю…'; invoke('caldav_set', { user: cdU.value.trim(), pass: cdP.value }).then(() => { cdP.value = ''; return invoke('caldav_diag'); }).then(t => { cdSt.textContent = t; }).catch(e => { cdSt.textContent = 'ошибка: ' + e; }); };
+  document.getElementById('cal-save').onclick = () => invoke('calendar_set', { url: cal.value.trim() }).then(() => { calSt.textContent = cal.value.trim() ? 'сохранено, напомню за 5 минут' : 'календарь отключён'; setTimeout(() => { calSt.textContent = ''; }, 3000); }).catch(() => { calSt.textContent = 'не сохранилось'; });
+  if (T && T.event) {
+    T.event.listen('pets-changed', () => load());
+    T.event.listen('select-pet', e => { showTab('pets'); select(e.payload, true); });
+  }
+  load();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "settings",
+  "description": "Окно «Питомцы»: список, окрас, телосложение, добавить и убрать",
+  "windows": ["settings"],
+  "permissions": ["core:default", "allow-screens", "allow-pets-list", "allow-pet-update", "allow-pet-add", "allow-pet-add-custom", "allow-pet-remove", "allow-calendar-get", "allow-calendar-set", "allow-caldav-get", "allow-caldav-set", "allow-caldav-fetch", "allow-caldav-diag", "allow-whoami", "allow-visits-set", "allow-export-pets", "allow-pets-recall", "allow-pet-visit", "allow-open-url", "allow-settings-fit"]
+}

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-caldav-diag"
+description = "Enables the caldav_diag command without any pre-configured scope."
+commands.allow = ["caldav_diag"]
+
+[[permission]]
+identifier = "deny-caldav-diag"
+description = "Denies the caldav_diag command without any pre-configured scope."
+commands.deny = ["caldav_diag"]

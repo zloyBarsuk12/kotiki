@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-pet-visible"
+description = "Enables the pet_visible command without any pre-configured scope."
+commands.allow = ["pet_visible"]
+
+[[permission]]
+identifier = "deny-pet-visible"
+description = "Denies the pet_visible command without any pre-configured scope."
+commands.deny = ["pet_visible"]

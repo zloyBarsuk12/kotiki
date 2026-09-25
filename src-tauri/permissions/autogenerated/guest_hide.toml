@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-guest-hide"
+description = "Enables the guest_hide command without any pre-configured scope."
+commands.allow = ["guest_hide"]
+
+[[permission]]
+identifier = "deny-guest-hide"
+description = "Denies the guest_hide command without any pre-configured scope."
+commands.deny = ["guest_hide"]

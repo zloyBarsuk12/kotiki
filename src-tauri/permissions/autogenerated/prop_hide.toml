@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-prop-hide"
+description = "Enables the prop_hide command without any pre-configured scope."
+commands.allow = ["prop_hide"]
+
+[[permission]]
+identifier = "deny-prop-hide"
+description = "Denies the prop_hide command without any pre-configured scope."
+commands.deny = ["prop_hide"]
