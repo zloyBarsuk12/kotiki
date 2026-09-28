@@ -479,7 +479,7 @@
     }
     achSave();
   }
-  async function portalEvent(kind, data) { if (DEMO || GUEST || !invoke) return; try { if (!me) me = await invoke('whoami'); await portal('POST', '/event', Object.assign({ client: me.client, kind, pet: NAME }, data || {})); } catch (_) { /* портал недоступен */ } }
+  async function portalEvent(kind, data) { if (DEMO || GUEST || !invoke) return; try { if (!me) await whoAmI(); await portal('POST', '/event', Object.assign({ client: me.client, kind, pet: NAME }, data || {})); } catch (_) { /* портал недоступен */ } }
   function badgeShow(ico, title) {
     portalEvent('badge', { title });
     hearts(3); for (let i = 0; i < 6; i++) setTimeout(() => fx('zzz', pick(['✦', '★', '✧']), rnd(-40, 40), rnd(-20, 10), 1500), i * 150);
@@ -649,7 +649,7 @@
     if (h === 10 && d.getMinutes() < 30 && rollDay !== day && !busy()) {   // перекличка: кто из коллег на связи
       try { localStorage.setItem('rollDay', day); } catch (_) { /* без памяти */ }
       try {
-        if (!me) me = await invoke('whoami');
+        if (!me) await whoAmI();
         const on = (await portal('GET', '/online') || []).filter(c => c.online && c.client !== me.client);
         const t = on.length ? 'На связи: ' + on.slice(0, 5).map(c => ((c.pets || []).map(q => q.name).filter(Boolean).slice(0, 2).join(' и ') || 'питомцы') + ' (' + (c.name || '').split(' ')[0] + ')').join(', ') + (on.length > 5 ? ' и ещё ' + (on.length - 5) : '') : 'Перекличка: кроме нас пока никого';
         cheer(t);
@@ -728,7 +728,7 @@
   }
   async function discoAll() {
     if (DEMO || GUEST || !invoke) return;
-    try { if (!me) me = await invoke('whoami'); await portal('POST', '/party', { from: me.client }); } catch (_) { /* портал недоступен — танцуем одни */ }
+    try { if (!me) await whoAmI(); await portal('POST', '/party', { from: me.client }); } catch (_) { /* портал недоступен — танцуем одни */ }
   }
   function dance() {
     dancing = true;
@@ -1256,7 +1256,7 @@
   // чужая приходит с именем хозяина — старший объявляет, откуда она.
   async function mouseEscape() {
     if (mouseEscapeDone || GUEST || DEMO || !invoke || !visitsOn || PET.label !== leaderLabel()) return; mouseEscapeDone = true;
-    try { if (!me) me = await invoke('whoami'); if (!peers.length) peers = await portal('GET', '/peers?client=' + encodeURIComponent(me.client)); } catch (_) { return; }
+    try { if (!me) await whoAmI(); if (!peers.length) peers = await portal('GET', '/peers?client=' + encodeURIComponent(me.client)); } catch (_) { return; }
     if (!peers.length) return;
     const to = pick(peers);
     try { await portal('POST', '/send', { from: me.client, to: to.client, kind: 'mouse', payload: {} }); say(`Мышь удрала к ${to.name}!`, 2600); } catch (_) { /* портал недоступен — просто ушла */ }
@@ -1567,7 +1567,7 @@
   function snapshotPng() { const off = document.createElement('canvas'); off.width = canvas.width; off.height = canvas.height; off.getContext('2d').drawImage(canvas, 0, 0); return off.toDataURL('image/png'); }
   async function albumUpload(dataUrl, caption, group) {
     if (DEMO || GUEST || !invoke || !albumOn()) return;
-    try { if (!me) me = await invoke('whoami'); await portal('POST', '/photo', { client: me.client, png: dataUrl.split(',')[1], caption: String(caption || '').slice(0, 160), group: group || '' }); } catch (e) { console.error('альбом', e); }
+    try { if (!me) await whoAmI(); await portal('POST', '/photo', { client: me.client, png: dataUrl.split(',')[1], caption: String(caption || '').slice(0, 160), group: group || '' }); } catch (e) { console.error('альбом', e); }
   }
   function composeSelfie(guestPng, guestName, owner) {
     return new Promise(res => {
@@ -2135,6 +2135,14 @@
   }
   let weekCrown = false, bdayHat = -1e9, bdaysSaid = '';   // «кот недели» — портал отдаёт crown в ответе /hello; колпак в день рождения хозяина
   let me = null, peers = [], visitsOn = true, lastVisitAt = now(), away = null, lastGuestAt = -1e9, guestFrom = '', visiting = false, backTimer = 0;   // первый визит — не раньше чем через 20 минут после запуска
+  // Кто мы (клиент, пользователь, версия) и включены ли гости. Флаг visitsOn берём из whoami ОДИН раз, при первом
+  // чтении: дальше его меняет только событие visits из окна «Питомцы». Раньше hello() каждую минуту перезаписывал
+  // флаг из закэшированного me — снятая галочка возвращалась сама, и гости продолжали ходить до перезапуска.
+  async function whoAmI() {
+    if (me) return me;
+    const w = await invoke('whoami'); if (!me) { me = w; visitsOn = w.visits !== false; }
+    return me;
+  }
   async function portal(method, path, body) {
     if (!PORTAL) throw new Error('сеть питомцев выключена');
     const r = await fetch(PORTAL + path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, cache: 'no-store' });
@@ -2156,8 +2164,7 @@
   async function hello() {
     if (DEMO || GUEST || !invoke || PET.label !== leaderLabel()) return;
     try {
-      if (!me) me = await invoke('whoami');
-      visitsOn = me.visits !== false;
+      if (!me) await whoAmI();
       // счётчики всех своих питомцев — из общего localStorage (ключи ach:/care:/born: по метке окна)
       const stat = (label, sp, name) => { let a = null, c = null, born = null; try { a = JSON.parse(localStorage.getItem('ach:' + label) || 'null'); c = JSON.parse(localStorage.getItem('care:' + label) || 'null'); born = localStorage.getItem('born:' + label); } catch (_) { /* без данных */ }
         const n = (a && a.n) || {}; return { sp, name, days: born ? Math.max(0, Math.floor((Date.now() - Date.parse(born)) / 86400e3)) : Math.floor(AGE), badges: (a && a.got || []).length, ach: (a && a.got) || [], fed: n.fed || 0, pet: n.pet || 0, play: n.play || 0, visit: n.visit || 0, guest: n.guest || 0 }; };
@@ -2180,12 +2187,13 @@
   const guestQueue = [];
   const guestBusy = () => now() - lastGuestAt < 60000 || (friends.get('guest') && now() - friends.get('guest').t < 3000);
   function guestShow(v) {
-    const p = v.p, dur = Math.max(0, v.until - now()); if (dur < 40000) return;
+    const p = v.p, dur = Math.max(0, v.until - now()); if (dur < 40000 || !visitsOn) return;
     lastGuestAt = now(); guestFrom = v.from;
     invoke('guest_show', { pet: Object.assign({}, p.pet, { msg: String(p.msg || '').slice(0, 120) }), owner: p.owner || 'кто-то', dur: Math.round(dur) }).then(() => { achCount('guest'); if (T && T.event) T.event.emit('guest-coming', { owner: p.owner || 'кто-то', name: p.pet.name || '' }).catch(() => {}); }).catch(e => console.error('guest_show', e));
   }
   async function inboxPoll() {
     if (DEMO || GUEST || !invoke || !me || PET.label !== leaderLabel()) return;
+    if (!visitsOn) guestQueue.length = 0;        // гостей выключили — очередь не нужна
     while (guestQueue.length && guestQueue[0].until - now() < 40000) guestQueue.shift();   // просроченные — вон
     if (guestQueue.length && !guestBusy()) guestShow(guestQueue.shift());
     let msgs = []; try { msgs = await portal('GET', '/inbox?client=' + encodeURIComponent(me.client)); } catch (_) { return; }
@@ -2223,7 +2231,7 @@
   async function goVisit(target, force, msg) {
     if (DEMO || GUEST || !invoke || away || (!visitsOn && !force)) return acts.sit();
     if (!force) try { if (+localStorage.getItem('awayUntil') > Date.now()) return acts.sit(); } catch (_) { /* без памяти */ }   // в гостях не больше одного питомца сразу
-    try { if (!me) me = await invoke('whoami'); if (!target) peers = await portal('GET', '/peers?client=' + encodeURIComponent(me.client)); } catch (_) { return acts.sit(); }
+    try { if (!me) await whoAmI(); if (!target) peers = await portal('GET', '/peers?client=' + encodeURIComponent(me.client)); } catch (_) { return acts.sit(); }
     if (!target && !peers.length) return acts.sit();
     const to = target || pickPeer(peers), s = S(), c = myCenter(), m = monAt(c.x, c.y); if (!m || !to) return acts.sit();
     lastVisitAt = now(); visiting = true;
@@ -2399,7 +2407,7 @@
   }
   if (!DEMO && invoke) {
     if (GUEST) setTimeout(guestArrive, 800);
-    else { setTimeout(hello, 3000); setInterval(hello, 60000); setInterval(inboxPoll, 10000); }
+    else { setTimeout(() => whoAmI().catch(() => {}), 400); setTimeout(hello, 3000); setInterval(hello, 60000); setInterval(inboxPoll, 10000); }
   }
   function next() {
     const f = friendNear(500);
@@ -2695,7 +2703,7 @@
       if (Date.now() - (g.born || 0) > 86400e3) { try { localStorage.removeItem(k); } catch (_) { /* без памяти */ } continue; }
       const what = pick(['flowers', 'candy', 'balloons', 'cake', 'teddy', 'pie', 'ball', 'yarn', 'bubbles']);
       try {
-        if (!me) me = await invoke('whoami');
+        if (!me) await whoAmI();
         await portal('POST', '/send', { from: me.client, to: k.slice(9), kind: 'gift', payload: { what, msg: `В ответ от ${NAME}` } });
         try { localStorage.removeItem(k); } catch (_) { /* без памяти */ }
         say(`Отнёс{|ла} ответный подарок для ${g.owner}`, 3000); hearts(2); achCount('gift');
@@ -2750,7 +2758,7 @@
     if (DEMO || GUEST || !invoke || away || !visitsOn || dnd() || PET.label !== leaderLabel()) return false;
     const hops = netBall ? (netBall.hops || 0) + 1 : 1; if (hops > 3 || now() - lastNetBall < 90000) return false;
     try {
-      if (!me) me = await invoke('whoami');
+      if (!me) await whoAmI();
       let to = null;
       if (netBall && netBall.fromClient) to = { client: netBall.fromClient, name: netBall.owner || 'коллега' };
       else { const list = await portal('GET', '/peers?client=' + encodeURIComponent(me.client)); to = pickPeer(list); }
@@ -3049,7 +3057,11 @@
     T.event.listen('sound', e => { sound = !!e.payload; });
     T.event.listen('call', e => callMode(!!e.payload));
     T.event.listen('calendar', e => { calUrl = e.payload || ''; calEvents = []; calendarFetch(); });
-    T.event.listen('visits', e => { visitsOn = !!e.payload; });
+    T.event.listen('visits', e => {
+      visitsOn = !!e.payload; if (me) me.visits = visitsOn;
+      if (!visitsOn) { guestQueue.length = 0; if (GUEST && !guestLeaving) { overnight = true; say(pick(['Хозяева просят не беспокоить. Ухожу', 'Понял{|а}, гостей не ждут. До встречи!']), 2400); setTimeout(guestLeave, 600); } }
+      if (!GUEST && PET.label === leaderLabel()) hello();   // портал узнаёт сразу, а не через минуту
+    });
     T.event.listen('recall', () => { if (away) comeBack(); else invoke('pet_visible', { label: PET.label, on: true }).catch(() => {}); });
     T.event.listen('visit-to', e => { const q = e.payload || {}; if (q.label !== PET.label || GUEST) return; if (away) return say('Я и так в гостях', 1600); goVisit({ client: q.to, name: q.name || 'коллега' }, true, q.msg || ''); });
     T.event.listen('caldav', () => { invoke('caldav_get').then(c => { calDav = !!(c && c.user && c.has_pass); calEvents = []; calendarFetch(); }).catch(() => {}); });
@@ -3108,7 +3120,7 @@
       }
     });
   }
-  if (window.__PET_TEST) window.__pt = { acts, feed, come, playMode, pet, hiss, play, perch, perchOk, deskPoll, achCount, cure, trick, trickShow, gather, onGoal, dailyTick, inputPoll, dance, set nest(v) { nest = v; }, get score() { return score; }, set quietUntil(v) { quietUntil = v; }, get quietUntil() { return quietUntil; }, get ach() { return ach; }, get care() { return care; }, goVisit, comeBack, hello, inboxPoll, guestArrive, guestLeave, visit, leap, flee, friends, cheer, chatStart, chatReceive, tagInvite, playReceive, ballStart, fetch_, onUserKick, onLaser, onButterfly, onMouse, mouseEscape, disco, discoAll, onGift, seasonTick, remindersTick, dozeOff, welcomeBack, quietSched, questsTick, relAdd, relGet, relSet, relDecay, peaceGo, resetGuestGate: () => { lastGuestAt = -1e9; }, get SCALE() { return SCALE; }, get focusLeft() { return focusUntil - now(); }, get lastReact() { return now() - lastReact; }, sickTick, sickShow, bowlKick, bowlFeedShow, giftCarryOut, feed2: feed, drink, foodTaste, maybeInfect, infect: () => { lastInfect = -1e9; const f = { sick: true, name: 'тест' }; const r = Math.random; Math.random = () => 0; try { maybeInfect(f); } finally { Math.random = r; } }, coarseAct, giftStore, get guestSick() { return guestSick; }, noteDeliver, noteStore, guestQueue, guestBusy, nrelGet, nrelSet, nrelAdd, netFriends, meetGuest, netBallSend, netBallReceive, pickPeer, groupPhoto, overnightStay, guestFriendHere, quietEnd, scheduleGiftBack, giftBackTick, friendOwner, relayStart, relayMates, knowsTrick, comfort, comfortTarget, start, isBaby, guestTrick, onPoll, myPollsTick, yearCard, composeSelfie, albumUpload, umbrellaPhrase, set weatherDay(v) { weatherDay = v; }, set mood(v) { mood = v; }, get mood() { return mood; }, askFood, bowlBring, beg, bowlEat, birdAsk, get bowl() { return bowl; }, set begging(v) { begging = v; }, get SEA() { return SEA; }, set SEA(v) { SEA = v; }, set weekCrown(v) { weekCrown = v; }, get gift() { return gift; }, raceStart, get race() { return race; }, guestPlan, get mouse() { return mouse; }, hideParty, seekStart, get seeking() { return seeking; }, nag, hideAndSeek, shellGame, shellPick, pomodoro, pomoTick, callMode, nudgeCursor, photo, parseIcs, onBubbles, scratchPost, set calEvents(v) { calEvents = v; }, calendarTick, get inCall() { return inCall; }, get shell() { return shell; }, get hiding() { return hiding; }, get pomo() { return pomo; }, set pomo(v) { pomo = v; }, weatherPhrase, set weather(v) { weather = v; }, set HOL(v) { HOL = v; }, get ball() { return ball; }, get bed() { return bed; }, get pal() { return pal; }, get chat() { return chat; }, get A() { return A; }, get pos() { return [x, y]; } };
+  if (window.__PET_TEST) window.__pt = { acts, feed, come, playMode, pet, hiss, play, perch, perchOk, deskPoll, achCount, cure, trick, trickShow, gather, onGoal, dailyTick, inputPoll, dance, set nest(v) { nest = v; }, get score() { return score; }, set quietUntil(v) { quietUntil = v; }, get quietUntil() { return quietUntil; }, get ach() { return ach; }, get care() { return care; }, goVisit, comeBack, hello, inboxPoll, guestArrive, guestLeave, visit, leap, flee, friends, cheer, chatStart, chatReceive, tagInvite, playReceive, ballStart, fetch_, onUserKick, onLaser, onButterfly, onMouse, mouseEscape, disco, discoAll, onGift, seasonTick, remindersTick, dozeOff, welcomeBack, quietSched, questsTick, relAdd, relGet, relSet, relDecay, peaceGo, resetGuestGate: () => { lastGuestAt = -1e9; }, get visitsOn() { return visitsOn; }, get SCALE() { return SCALE; }, get focusLeft() { return focusUntil - now(); }, get lastReact() { return now() - lastReact; }, sickTick, sickShow, bowlKick, bowlFeedShow, giftCarryOut, feed2: feed, drink, foodTaste, maybeInfect, infect: () => { lastInfect = -1e9; const f = { sick: true, name: 'тест' }; const r = Math.random; Math.random = () => 0; try { maybeInfect(f); } finally { Math.random = r; } }, coarseAct, giftStore, get guestSick() { return guestSick; }, noteDeliver, noteStore, guestQueue, guestBusy, nrelGet, nrelSet, nrelAdd, netFriends, meetGuest, netBallSend, netBallReceive, pickPeer, groupPhoto, overnightStay, guestFriendHere, quietEnd, scheduleGiftBack, giftBackTick, friendOwner, relayStart, relayMates, knowsTrick, comfort, comfortTarget, start, isBaby, guestTrick, onPoll, myPollsTick, yearCard, composeSelfie, albumUpload, umbrellaPhrase, set weatherDay(v) { weatherDay = v; }, set mood(v) { mood = v; }, get mood() { return mood; }, askFood, bowlBring, beg, bowlEat, birdAsk, get bowl() { return bowl; }, set begging(v) { begging = v; }, get SEA() { return SEA; }, set SEA(v) { SEA = v; }, set weekCrown(v) { weekCrown = v; }, get gift() { return gift; }, raceStart, get race() { return race; }, guestPlan, get mouse() { return mouse; }, hideParty, seekStart, get seeking() { return seeking; }, nag, hideAndSeek, shellGame, shellPick, pomodoro, pomoTick, callMode, nudgeCursor, photo, parseIcs, onBubbles, scratchPost, set calEvents(v) { calEvents = v; }, calendarTick, get inCall() { return inCall; }, get shell() { return shell; }, get hiding() { return hiding; }, get pomo() { return pomo; }, set pomo(v) { pomo = v; }, weatherPhrase, set weather(v) { weather = v; }, set HOL(v) { HOL = v; }, get ball() { return ball; }, get bed() { return bed; }, get pal() { return pal; }, get chat() { return chat; }, get A() { return A; }, get pos() { return [x, y]; } };
   window.addEventListener('resize', resize);
   refreshScreens().then(() => requestAnimationFrame(loop));
   setInterval(refreshScreens, 10000);

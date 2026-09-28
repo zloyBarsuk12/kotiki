@@ -752,6 +752,7 @@ fn guest_window(app: &AppHandle, p: Pet) -> Result<(), String> {
 
 #[tauri::command]
 async fn guest_show(app: AppHandle, pet: Pet, owner: String, dur: Option<f64>) -> Result<(), String> {   // f64: старые клиенты шлют дробный срок, u64 его отвергал — гость не появлялся
+    if !app.state::<AppState>().cfg.lock().unwrap().visits { return Err("гости выключены в настройках".into()); }   // последняя линия защиты
     let mut p = pet;
     p.label = "guest".into();
     p.guest = true;
@@ -770,6 +771,9 @@ async fn guest_show(app: AppHandle, pet: Pet, owner: String, dur: Option<f64>) -
 /// При старте: если гость по конфигу ещё не догостил — вернуть его на остаток срока.
 fn guest_restore(app: &AppHandle) {
     let st = app.state::<AppState>();
+    if !st.cfg.lock().unwrap().visits {             // гостей выключили — сохранённого гостя после перезапуска не возвращаем
+        st.cfg.lock().unwrap().guest = None; st.save(); return;
+    }
     let g = st.cfg.lock().unwrap().guest.clone();
     let Some(g) = g else { return };
     let now = now_ms();

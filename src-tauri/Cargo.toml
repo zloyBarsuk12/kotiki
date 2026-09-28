@@ -1,7 +1,7 @@
 [package]
 license = "MIT"
 name = "kotik"
-version = "1.45.0"
+version = "1.45.1"
 description = "Котик и щенок на рабочем столе"
 authors = ["Kotik contributors"]
 edition = "2021"
