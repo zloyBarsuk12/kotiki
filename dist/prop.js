@@ -1,4 +1,4 @@
-// Предметы — отдельные окна 120×120 поверх всех: мячик, лазерная точка, бабочка, лежанка, мышь.
+// Предметы — отдельные окна 120×120 поверх всех: мячик, лазерная точка, бабочка, лежанка, мышь, лоток.
 // window.PROP = { kind, x, y } ставит Rust при создании. Общее: окно ездит командой frame,
 // раз в 100 мс рассылает prop-pos { kind, x, y, … }; питомцы отвечают событиями prop-kick
 // (мяч, бабочка) и prop-carry (мяч в зубах). Без дела предмет просит Rust себя закрыть.
@@ -8,20 +8,20 @@
   const invoke = T.core.invoke;
   const P = window.PROP || { kind: 'ball', x: 600, y: 600 };
   const KIND = P.kind || 'ball';
-  const W = ({ bubbles: 260, post: 140, nest: 180, gift: 300, bed: 190, poll: 280 })[KIND] || 120, H = ({ bubbles: 520, post: 180, gift: 260, bed: 160, poll: 130 })[KIND] || 120;
+  const W = ({ bubbles: 260, post: 140, nest: 180, gift: 300, bed: 190, poll: 280, potty: 230 })[KIND] || 120, H = ({ bubbles: 520, post: 180, gift: 260, bed: 160, poll: 130, potty: 210 })[KIND] || 120;
   const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
   let DPR = 1;
   function resize() { DPR = Math.max(1, window.devicePixelRatio || 1); canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR); }
   resize();
   const S = () => window.devicePixelRatio || 1;
   const rnd = (a, b) => a + Math.random() * (b - a);
-  let mons = [], cur = { x: 0, y: 0 }, btn = false, ignoreSent = null, inflight = false, pending = null;
+  let mons = [], cur = { x: 0, y: 0 }, btn = false, ignoreSent = null, inflight = false, pending = null, placed = false;   // placed — Rust уже двигал окно по нашей команде
   const MAC = /Mac/i.test(navigator.platform || navigator.userAgent); let btnJS = false;   // на macOS кнопку мыши даёт само окно
   canvas.addEventListener('pointerdown', e => { if (e.button === 0) btnJS = true; });
   for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) canvas.addEventListener(ev, () => { btnJS = false; });
   const monAt = (px, py) => mons.find(m => px >= m.x && px < m.x + m.w && py >= m.y && py < m.y + m.h) || mons[0];
   function send(a) { pending = a; if (inflight) return; inflight = true; const q = pending; pending = null;
-    invoke('frame', q).then(r => { cur = { x: r.cx, y: r.cy }; btn = MAC ? btnJS : r.btn; }).catch(() => {}).finally(() => { inflight = false; if (pending) send(pending); }); }
+    invoke('frame', q).then(r => { placed = true; cur = { x: r.cx, y: r.cy }; btn = MAC ? btnJS : r.btn; }).catch(() => {}).finally(() => { inflight = false; if (pending) send(pending); }); }
   const hide = () => invoke('prop_hide', { kind: KIND }).catch(() => {});
   canvas.addEventListener('contextmenu', e => { e.preventDefault(); hide(); });   // правый клик — убрать предмет
   function shadeHex(hex, k) { const n = parseInt(hex.slice(1), 16), c = [n >> 16, (n >> 8) & 255, n & 255].map(v => Math.round(k < 0 ? v * (1 + k) : v + (255 - v) * k)); return '#' + c.map(v => v.toString(16).padStart(2, '0')).join(''); }
@@ -456,6 +456,153 @@
       requestAnimationFrame(loop);
     }
     invoke('screens').then(r => { mons = r.monitors; const m = monAt(P.x, P.y) || mons[0]; if (m) { const s = S(); cy = m.y + m.h - 2 * s; cx = Math.max(m.x + 40 * s, Math.min(m.x + m.w - 40 * s, P.x)); } requestAnimationFrame(loop); }).catch(() => {});
+  }
+
+  // ======================= ЛОТОК =======================
+  // Лоток-робот: сам приезжает из-за края экрана, когда коту пора (prop_show от питомца, data: { side }),
+  // встаёт в углу и после уборки уезжает. Питомец шлёт prop-kick { kind: 'potty', … }: enter (зашёл — снаружи
+  // торчит хвост его цвета), leave (вышел), dig (закапывает — летит наполнитель), peek (на него смотрят —
+  // высовывается возмущённая морда), miss (котёнок промахнулся — лужица рядом), want (кто-то ждёт очереди).
+  // Фазы: in → ready → busy → wait → clean → (full | ready | out). Контейнер: каждый поход +1 к potty:fill,
+  // на десятом индикатор краснеет и кот внутрь не идёт; щелчок по лотку — опустошить. Флаг potty:bin = '0'
+  // выключает контейнер. Правый клик убирает лоток.
+  if (KIND === 'potty') {
+    let d = {}; try { d = JSON.parse(P.data || '{}') || {}; } catch (_) { /* без данных — приедет справа */ }
+    const MAX = 10, side = d.side < 0 ? -1 : 1, EMO = '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+    let cx = P.x, cy = P.y, park = P.x, phase = 'in', by = null, last = null, occ = null, t0 = performance.now(), lastT = t0, rot = 0, wheel = 0;
+    let readyT = 0, busyT = 0, waitT = 0, cleanT = 0, fullT = 0, emptyT = 0, wantT = -1e9, peekT = -1e9, digT = -1e9, sparkT = -1e9, puddle = 0, hover = false;
+    let fill = 0, bin = true, lastRead = -1e9, puddleX = -98;
+    function readStore() { try { fill = Math.max(0, +localStorage.getItem('potty:fill') || 0); bin = localStorage.getItem('potty:bin') !== '0'; } catch (_) { /* без памяти — контейнер не копит */ } }
+    function saveFill() { try { localStorage.setItem('potty:fill', String(fill)); } catch (_) { /* без памяти */ } lastRead = performance.now(); }
+    const isFull = () => bin && fill >= MAX;
+    readStore();
+    T.event.listen('prop-kick', e => {
+      const k = e.payload || {}, n = performance.now(); if (k.kind !== 'potty') return;
+      if (k.enter && !by && (phase === 'ready' || phase === 'in')) { by = k.by || 'pet'; occ = { fur: k.fur || '#c9a27a', tail: k.tail || k.fur || '#c9a27a', sp: k.sp || 'cat' }; phase = 'busy'; busyT = n; cx = park; }
+      if (k.leave && by && (!k.by || k.by === by)) {
+        last = by; by = null;
+        if (k.ok === false) { phase = 'ready'; readyT = n; }                      // зашёл и вышел без дела (показывал малышу, перебили) — убирать нечего
+        else { phase = 'wait'; waitT = n; if (bin) { fill++; saveFill(); } }
+      }
+      if (k.peek) peekT = n;
+      if (k.dig) digT = n;
+      if (k.miss) { puddle = n; puddleX = (+k.dx || -1) < 0 ? -98 : 98; if (phase === 'ready' || phase === 'in') { last = k.by || last; phase = 'wait'; waitT = n; cx = park; } }
+      if (k.want) wantT = n;
+      if (k.hide && !by) phase = 'out';
+    });
+    canvas.addEventListener('pointerdown', e => {               // щелчок по полному лотку — опустошить контейнер
+      if (e.button !== 0 || phase !== 'full') return;
+      phase = 'empty'; emptyT = performance.now();
+    });
+    function draw(n) {
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.clearRect(0, 0, W, H);
+      const bx = W / 2, by_ = H - 12, shake = phase === 'busy' ? Math.sin(n / 60) * (Math.sin(n / 700) > .2 ? .9 : 0) : phase === 'clean' ? Math.sin(n / 35) * .5 : 0;
+      ctx.save(); ctx.translate(bx + shake, by_);
+      if (puddle) {                                // лужица котёнка — слева от лотка, робот вытирает её при уборке
+        const k = phase === 'clean' ? Math.max(0, 1 - (n - cleanT) / 2400) : 1;
+        ctx.fillStyle = `rgba(226,206,96,${.75 * k})`; ctx.beginPath(); ctx.ellipse(puddleX, -2, 13 * k + 2, 3.2 * k + .6, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = `rgba(255,255,255,${.5 * k})`; ctx.beginPath(); ctx.ellipse(puddleX - 3, -3, 4 * k, 1, 0, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.fillStyle = 'rgba(0,0,0,.16)'; ctx.beginPath(); ctx.ellipse(0, 3, 82, 8, 0, 0, Math.PI * 2); ctx.fill();
+      // колёса
+      for (const wx of [-54, 54]) { ctx.fillStyle = '#3d424a'; ctx.beginPath(); ctx.arc(wx, -3, 7, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#9aa1ab'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(wx + Math.cos(wheel) * 5, -3 + Math.sin(wheel) * 5); ctx.lineTo(wx - Math.cos(wheel) * 5, -3 - Math.sin(wheel) * 5); ctx.stroke(); }
+      // барабан
+      const gg = ctx.createRadialGradient(-22, -128, 8, 0, -98, 70); gg.addColorStop(0, '#ffffff'); gg.addColorStop(.7, '#eef0f4'); gg.addColorStop(1, '#cfd4dc');
+      ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(0, -98, 64, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(70,80,95,.45)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(0, -98, 64, 0, Math.PI * 2); ctx.stroke();
+      ctx.save(); ctx.translate(0, -98); ctx.rotate(rot); ctx.strokeStyle = 'rgba(90,100,115,.35)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      for (let i = 0; i < 10; i++) { const a = i * Math.PI / 5; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 55, Math.sin(a) * 55); ctx.lineTo(Math.cos(a) * 61, Math.sin(a) * 61); ctx.stroke(); }
+      ctx.restore();
+      // вход
+      ctx.save(); ctx.beginPath(); ctx.ellipse(0, -92, 38, 44, 0, 0, Math.PI * 2); ctx.clip();
+      ctx.fillStyle = '#2f343c'; ctx.fillRect(-40, -140, 80, 96);
+      ctx.fillStyle = '#d9c9a3'; ctx.beginPath(); ctx.ellipse(0, -52, 40, 14, 0, 0, Math.PI * 2); ctx.fill();          // наполнитель на дне
+      ctx.fillStyle = 'rgba(150,130,90,.5)'; for (let i = 0; i < 12; i++) { ctx.beginPath(); ctx.arc(-30 + i * 5.5, -58 + (i * 7 % 5), 1.3, 0, Math.PI * 2); ctx.fill(); }
+      if (by && occ && n - peekT < 1700) {        // возмущённая морда в проёме
+        const k = Math.min(1, (n - peekT) / 160), hy = -84 + (1 - k) * 30;
+        ctx.fillStyle = occ.fur; ctx.beginPath(); ctx.moveTo(-24, hy - 16); ctx.lineTo(-19, hy - 40); ctx.lineTo(-5, hy - 22); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(24, hy - 16); ctx.lineTo(19, hy - 40); ctx.lineTo(5, hy - 22); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(0, hy, 28, 24, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#fff'; for (const ex of [-11, 11]) { ctx.beginPath(); ctx.ellipse(ex, hy - 3, 6.5, 6, 0, 0, Math.PI * 2); ctx.fill(); }
+        ctx.fillStyle = '#23201e'; for (const ex of [-11, 11]) { ctx.beginPath(); ctx.ellipse(ex, hy - 2, 2.2, 4.5, 0, 0, Math.PI * 2); ctx.fill(); }
+        ctx.strokeStyle = '#23201e'; ctx.lineWidth = 2.4; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(-19, hy - 13); ctx.lineTo(-5, hy - 8); ctx.moveTo(19, hy - 13); ctx.lineTo(5, hy - 8); ctx.stroke();   // брови домиком вниз
+        ctx.fillStyle = '#e58a8a'; ctx.beginPath(); ctx.moveTo(-3, hy + 6); ctx.lineTo(3, hy + 6); ctx.lineTo(0, hy + 9.5); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = '#23201e'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(-5, hy + 15); ctx.quadraticCurveTo(0, hy + 11, 5, hy + 15); ctx.stroke();
+      } else if (by) { ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(0, -74, 26, 20, 0, 0, Math.PI * 2); ctx.fill(); }   // силуэт внутри
+      if (phase === 'clean') {                     // шторка закрывает вход на время уборки
+        const q = (n - cleanT) / 3600, k = q < .2 ? q / .2 : q > .8 ? (1 - q) / .2 : 1;
+        ctx.fillStyle = '#dfe3ea'; ctx.fillRect(-40, -140, 80, 96 * Math.max(0, Math.min(1, k)));
+        ctx.strokeStyle = 'rgba(70,80,95,.35)'; ctx.lineWidth = 1; for (let i = 1; i < 6; i++) { const yy = -140 + i * 16; if (yy < -140 + 96 * k) { ctx.beginPath(); ctx.moveTo(-40, yy); ctx.lineTo(40, yy); ctx.stroke(); } }
+      }
+      ctx.restore();
+      ctx.strokeStyle = 'rgba(70,80,95,.55)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(0, -92, 38, 44, 0, 0, Math.PI * 2); ctx.stroke();
+      // основание с контейнером
+      const out = phase === 'empty' ? Math.sin(Math.min(1, (n - emptyT) / 1200) * Math.PI) * 24 : 0;
+      const bg = ctx.createLinearGradient(0, -42, 0, 0); bg.addColorStop(0, '#f4f5f8'); bg.addColorStop(1, '#c9ced6');
+      ctx.fillStyle = bg; ctx.beginPath(); ctx.roundRect(-74, -42, 148, 40, 12); ctx.fill(); ctx.strokeStyle = 'rgba(70,80,95,.45)'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = '#e9ebef'; ctx.beginPath(); ctx.roundRect(-30, -50, 60, 9, 4); ctx.fill(); ctx.strokeStyle = 'rgba(70,80,95,.35)'; ctx.lineWidth = 1; ctx.stroke();   // ступенька
+      ctx.save(); ctx.translate(0, out * .35);
+      ctx.fillStyle = isFull() ? '#e9c9c4' : '#dde1e7'; ctx.beginPath(); ctx.roundRect(-46, -32 + out * 0, 92, 22, 6); ctx.fill(); ctx.strokeStyle = 'rgba(70,80,95,.4)'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.fillStyle = 'rgba(70,80,95,.5)'; ctx.beginPath(); ctx.roundRect(-12, -29, 24, 4, 2); ctx.fill();                  // ручка
+      if (bin) { const fk = Math.min(1, fill / MAX); ctx.fillStyle = 'rgba(70,80,95,.18)'; ctx.beginPath(); ctx.roundRect(-38, -19, 76, 5, 2.5); ctx.fill(); if (fk > 0) { ctx.fillStyle = fk >= 1 ? '#d9483b' : fk >= .7 ? '#e0a12b' : '#5fae5a'; ctx.beginPath(); ctx.roundRect(-38, -19, 76 * fk, 5, 2.5); ctx.fill(); } }
+      ctx.restore();
+      // индикатор: зелёный — готов, синий мигает — уборка, красный — контейнер полон
+      const blink = Math.sin(n / 160) > 0, lamp = phase === 'full' || (isFull() && phase !== 'clean' && phase !== 'empty') ? (Math.sin(n / 260) > -.3 ? '#e2412f' : '#7a2a22') : phase === 'clean' || phase === 'wait' ? (blink ? '#3d8bff' : '#1d4a90') : phase === 'busy' ? '#e0a12b' : '#44c15a';
+      ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.arc(60, -24, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = lamp; ctx.beginPath(); ctx.arc(60, -24, 4.2, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.beginPath(); ctx.arc(58.6, -25.4, 1.3, 0, Math.PI * 2); ctx.fill();
+      // хвост торчит наружу
+      if (by && occ && n - peekT >= 1700) {
+        const wag = Math.sin(n / 230) * 7 + Math.sin(n / 90) * 1.5;
+        ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 11; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(18, -58); ctx.bezierCurveTo(40, -52, 52, -66 + wag, 58, -88 + wag); ctx.stroke();
+        ctx.strokeStyle = occ.tail; ctx.lineWidth = 9; ctx.beginPath(); ctx.moveTo(18, -58); ctx.bezierCurveTo(40, -52, 52, -66 + wag, 58, -88 + wag); ctx.stroke();
+      }
+      // наполнитель летит, когда закапывают
+      if (n - digT < 1800) { const q = (n - digT) / 1000; ctx.fillStyle = '#c4a96a'; ctx.strokeStyle = 'rgba(90,70,30,.5)'; ctx.lineWidth = .8; for (let i = 0; i < 14; i++) { const ph = (q * 2.2 + i * .37) % 1, dir = i % 2 ? 1 : -1; ctx.globalAlpha = 1 - ph * .8; ctx.beginPath(); ctx.arc(dir * (16 + ph * 58 + i * 2), -50 - Math.sin(ph * Math.PI) * (30 + i * 3), 2.2 + (i % 3) * .6, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); } ctx.globalAlpha = 1; }
+      if (n - sparkT < 1100) { const q = (n - sparkT) / 1100; ctx.globalAlpha = 1 - q; ctx.font = '22px ' + EMO; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('✨', -56 - q * 10, -150 - q * 12); ctx.fillText('✨', 60 + q * 8, -132 - q * 16); ctx.font = '15px ' + EMO; ctx.fillText('✨', 8, -176 - q * 10); ctx.globalAlpha = 1; }
+      ctx.restore();
+      if (phase === 'full') { const t = 'контейнер полон · щёлкни'; ctx.fillStyle = 'rgba(255,255,255,.95)'; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 3; ctx.font = '600 12px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.strokeText(t, bx, 16 + Math.sin(n / 300) * 1.5); ctx.fillText(t, bx, 16 + Math.sin(n / 300) * 1.5); }
+    }
+    function loop() {
+      const n = performance.now(), s = S(), dt = Math.min(.05, (n - lastT) / 1000); lastT = n;
+      const m = monAt(park, cy) || mons[0]; if (!m) return hide();
+      if (n - lastRead > 1500) { lastRead = n; readStore(); }
+      const edge = side > 0 ? m.x + m.w + 130 * s : m.x - 130 * s;
+      if (phase === 'in') {
+        const v = 230 * s * dt, dx = park - cx;
+        if (Math.abs(dx) <= v) { cx = park; phase = isFull() ? 'full' : 'ready'; readyT = fullT = n; } else { cx += Math.sign(dx) * v; wheel += Math.sign(dx) * v / (7 * s); }
+      } else if (phase === 'ready') {
+        if (isFull()) { phase = 'full'; fullT = n; }
+        else if (n - readyT > 45000 && n - wantT > 3000) phase = 'out';
+      } else if (phase === 'busy') {
+        if (n - busyT > 40000) { last = by; by = null; phase = 'wait'; waitT = n; }      // питомца увели — не ждать вечно
+      } else if (phase === 'wait') {
+        if (n - waitT > 3200) { phase = 'clean'; cleanT = n; }
+      } else if (phase === 'clean') {
+        rot += dt * 2.6;
+        if (n - cleanT > 3600) { puddle = 0; sparkT = n; if (isFull()) { phase = 'full'; fullT = n; } else if (n - wantT < 3000) { phase = 'ready'; readyT = n; } else { phase = 'rest'; readyT = n; } }
+      } else if (phase === 'rest') {                 // блеснул чистотой — и поехал
+        if (n - wantT < 3000) { phase = 'ready'; readyT = n; } else if (n - readyT > 1400) phase = 'out';
+      } else if (phase === 'full') {
+        if (!isFull()) { phase = 'ready'; readyT = n; sparkT = n; }                        // опустошили из окна «Питомцы»
+        else if (n - fullT > 5 * 60000 && n - wantT > 3000) phase = 'out';
+      } else if (phase === 'empty') {
+        if (n - emptyT > 1200) { fill = 0; saveFill(); sparkT = n; phase = 'ready'; readyT = n - 25000; }
+      } else if (phase === 'out') {
+        const v = 230 * s * dt, dx = edge - cx;
+        if (Math.abs(dx) <= v) return hide();
+        cx += Math.sign(dx) * v; wheel += Math.sign(dx) * v / (7 * s);
+      }
+      if (placed) draw(n);                          // до первого ответа frame окно стоит у места стоянки — лоток мелькнул бы там раньше, чем въехал
+      hover = Math.abs(cur.x - cx) < 80 * s && cur.y > cy - 175 * s && cur.y < cy + 10 * s;
+      place(cx, cy, W / 2, H - 12, !(hover && (phase === 'full' || phase === 'ready' || phase === 'busy' || phase === 'rest')));
+      emitPos({ x: cx, y: cy, park, side, phase, by, last, fill, full: isFull(), bin, hover });
+      requestAnimationFrame(loop);
+    }
+    invoke('screens').then(r => {
+      mons = r.monitors; const m = monAt(P.x, P.y) || mons[0]; if (!m) return hide();
+      const s = S(); cy = m.y + m.h - 2 * s; park = Math.max(m.x + 90 * s, Math.min(m.x + m.w - 90 * s, P.x)); cx = side > 0 ? m.x + m.w + 130 * s : m.x - 130 * s;
+      t0 = lastT = performance.now(); requestAnimationFrame(loop);
+    }).catch(() => {});
   }
 
   // ======================= КОГТЕТОЧКА =======================

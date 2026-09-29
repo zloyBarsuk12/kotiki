@@ -170,6 +170,12 @@
   <h3>Домик</h3>
   <div class="row"><label><input type="checkbox" id="bed-house"> домик вместо лежанки — ночью светится окошко, если кто-то спит</label></div>
 </div>
+<div class="blk" title="Через 10–20 минут после еды коту «пора»: приезжает лоток-робот, кот делает дела, робот убирается и уезжает. Пёс просится гулять и уходит за край экрана, хомяк и кролик идут в уголок с опилками.">
+  <h3>Лоток</h3>
+  <div class="row"><label><input type="checkbox" id="potty-on"> лоток, прогулки и уголок — питомцы ходят после еды и воды</label></div>
+  <div class="row"><label><input type="checkbox" id="potty-bin"> контейнер надо опустошать — раз в 10 походов щёлкнуть по лотку</label> <span id="potty-fill" style="color:var(--muted);font-size:12px"></span> <button class="link" id="potty-empty">опустошить</button></div>
+  <div class="row"><label><input type="checkbox" id="potty-net"> коллеги видят статус «в лотке» в списке онлайн</label></div>
+</div>
 <div class="blk">
   <h3>День рождения хозяина</h3>
   <div class="row">🎂 <input id="owner-bday" placeholder="дд.мм" maxlength="5" style="width:70px"> <span style="color:var(--muted);font-size:12px">в этот день питомцы поздравят, а коллеги узнают из ленты</span></div>
@@ -736,6 +742,22 @@
   // домик — флаг bed:house, лежанка читает его сама
   const bedHouse = document.getElementById('bed-house'); try { bedHouse.checked = localStorage.getItem('bed:house') === '1'; } catch (_) { /* без памяти */ }
   bedHouse.onchange = () => { try { localStorage.setItem('bed:house', bedHouse.checked ? '1' : '0'); } catch (_) { /* без памяти */ } };
+  // лоток — флаги potty:off / potty:bin / potty:net и счётчик контейнера potty:fill; питомцы и окно лотка читают их сами
+  const pottyBox = { on: document.getElementById('potty-on'), bin: document.getElementById('potty-bin'), net: document.getElementById('potty-net'), fill: document.getElementById('potty-fill'), empty: document.getElementById('potty-empty') };
+  const pottyGet = (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (_) { return d; } };
+  const pottySet = (k, v) => { try { localStorage.setItem(k, v); } catch (_) { /* без памяти */ } };
+  function pottyLoad() {
+    pottyBox.on.checked = pottyGet('potty:off', '0') !== '1'; pottyBox.bin.checked = pottyGet('potty:bin', '1') !== '0'; pottyBox.net.checked = pottyGet('potty:net', '1') !== '0';
+    const n = Math.max(0, +pottyGet('potty:fill', '0') || 0), bin = pottyBox.bin.checked;
+    pottyBox.bin.disabled = pottyBox.net.disabled = !pottyBox.on.checked;
+    pottyBox.fill.textContent = bin ? (n >= 10 ? 'полон — кот внутрь не пойдёт' : `заполнен на ${Math.min(10, n)} из 10`) : '';
+    pottyBox.empty.style.display = bin && n > 0 ? '' : 'none';
+  }
+  pottyBox.on.onchange = () => { pottySet('potty:off', pottyBox.on.checked ? '0' : '1'); pottyLoad(); };
+  pottyBox.bin.onchange = () => { pottySet('potty:bin', pottyBox.bin.checked ? '1' : '0'); pottyLoad(); };
+  pottyBox.net.onchange = () => { pottySet('potty:net', pottyBox.net.checked ? '1' : '0'); };
+  pottyBox.empty.onclick = () => { pottySet('potty:fill', '0'); pottyLoad(); };
+  pottyLoad(); setInterval(pottyLoad, 3000);
   document.getElementById('vs-page').onclick = ev => { ev.preventDefault(); invoke('open_url', { url: ED.site + 'social.html' }).catch(() => {}); };
   peersLoad(); setInterval(peersLoad, 30000);
   // кто сейчас в гостях (метки away:<label> пишет сам питомец) и кнопка «вернуть всех»

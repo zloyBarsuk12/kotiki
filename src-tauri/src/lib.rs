@@ -368,9 +368,9 @@ fn pet_remove(app: AppHandle, label: String) {
     remove_pet(&app, Some(&label));
 }
 
-const PROPS: [&str; 12] = ["ball", "laser", "butterfly", "bed", "yarn", "post", "bubbles", "nest", "mouse", "gift", "bowl", "poll"];
+const PROPS: [&str; 13] = ["ball", "laser", "butterfly", "bed", "yarn", "post", "bubbles", "nest", "mouse", "gift", "bowl", "poll", "potty"];
 
-/// Предмет (мячик, лазер, бабочка, лежанка) — отдельное прозрачное окно; метка окна = вид.
+/// Предмет (мячик, лазер, бабочка, лежанка, лоток) — отдельное прозрачное окно; метка окна = вид.
 /// Только из async-команды или главного цикла (см. spawn_pet).
 #[tauri::command]
 /// `data` — JSON для окна (подарок: что, от кого, подпись); в страницу уходит строкой в window.PROP.data.
@@ -380,8 +380,8 @@ async fn prop_show(app: AppHandle, kind: String, x: i32, y: i32, data: Option<St
         return Ok(());
     }
     let w = WebviewWindowBuilder::new(&app, kind, WebviewUrl::App("prop.html".into()))
-        .title(match kind { "laser" => "Лазер", "butterfly" => "Бабочка", "bed" => "Лежанка", "yarn" => "Клубок", "post" => "Когтеточка", "bubbles" => "Пузыри", "nest" => "Гнездо", "mouse" => "Мышь", "gift" => "Подарок", "bowl" => "Миска", "poll" => "Опрос", _ => "Мячик" })
-        .inner_size(match kind { "bubbles" => 260.0, "post" => 140.0, "nest" => 180.0, "gift" => 300.0, "bed" => 190.0, "poll" => 280.0, _ => 120.0 }, match kind { "bubbles" => 520.0, "post" => 180.0, "gift" => 260.0, "bed" => 160.0, "poll" => 130.0, _ => 120.0 })
+        .title(match kind { "laser" => "Лазер", "butterfly" => "Бабочка", "bed" => "Лежанка", "yarn" => "Клубок", "post" => "Когтеточка", "bubbles" => "Пузыри", "nest" => "Гнездо", "mouse" => "Мышь", "gift" => "Подарок", "bowl" => "Миска", "poll" => "Опрос", "potty" => "Лоток", _ => "Мячик" })
+        .inner_size(match kind { "bubbles" => 260.0, "post" => 140.0, "nest" => 180.0, "gift" => 300.0, "bed" => 190.0, "poll" => 280.0, "potty" => 230.0, _ => 120.0 }, match kind { "bubbles" => 520.0, "post" => 180.0, "gift" => 260.0, "bed" => 160.0, "poll" => 130.0, "potty" => 210.0, _ => 120.0 })
         .transparent(true)
         .decorations(false)
         .always_on_top(true)

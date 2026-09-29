@@ -2131,7 +2131,7 @@ dependencies = [
 
 [[package]]
 name = "kotik"
-version = "1.45.1"
+version = "1.46.0"
 dependencies = [
  "base64 0.22.1",
  "reqwest",

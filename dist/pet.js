@@ -215,6 +215,7 @@
   }
   function render(t) {
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (inBox) return;                           // в лотке питомца не видно: хвост и морду рисует окно лотка
     const M = localMatrix();
     if (lift < 90 && !hanging()) {               // тень на земле
       const k = 1 - lift / 90, rx = (BIRD ? 34 : HAM ? 40 : CLIP ? 28 : KUZYA ? 44 : ROUND ? 46 : CUSTOM ? 44 : 52) * SCALE * (R.pose === 'loaf' ? 1.25 : 1);
@@ -224,9 +225,9 @@
       ctx.fillStyle = gr; ctx.save(); ctx.translate(cx, GY); ctx.scale(1, .13); ctx.translate(-cx, -GY); ctx.beginPath(); ctx.arc(cx, GY, rx, 0, Math.PI * 2); ctx.fill(); ctx.restore();
     }
     ctx.setTransform(M);
-    drawWheel(false);
+    drawWheel(false); drawTray(false);
     info = window.drawChibi(ctx, Object.assign({ sp: SP, pal, t, look }, R));
-    drawWheel(true);
+    drawWheel(true); drawTray(true);
     drawFood();
     drawSnow(); drawSeason(); drawSign();
     if (night() && gw > .3 && !DEMO && !FLY) {      // ночью гуляет с фонариком в лапе: корпус у лапы, луч вперёд-вниз
@@ -369,6 +370,8 @@
     fire() { noise('fire', 1.4, (t, r, lp, T) => (r * .35 + lp * 1.6) * Math.min(1, t / .08, (T - t) / .5) * (.8 + .2 * Math.sin(2 * Math.PI * 9 * t)), .8); },
     sneeze() { noise('sneeze', .35, (t, r) => (r * .5) * Math.min(1, t / .02, (.35 - t) / .2), .9); tone([[0, 700], [1, 300]], .18, .25, 'triangle', 8, .05); },
     crunch() { noise('crunch', .9, (t, r) => r * .3 * Math.pow(Math.max(0, Math.sin(2 * Math.PI * 7 * t)), 8), .7); },
+    whirr() { noise('whirr', 3.4, (t, r, lp, T) => lp * 2.4 * (.65 + .35 * Math.sin(2 * Math.PI * 41 * t)) * Math.min(1, t / .35, (T - t) / .6), .3); tone([[0, 95], [.15, 140], [.85, 140], [1, 90]], 3.4, .07, 'sawtooth'); },   // мотор лотка
+    scratch() { noise('scratch', 1.6, (t, r, lp, T) => (r - lp) * .32 * Math.pow(Math.max(0, Math.sin(2 * Math.PI * 4.5 * t)), 5) * Math.min(1, (T - t) / .3), .45); },   // закапывает
   };
   const SND = Object.assign({}, SYN, {
     meow() { sample(['meow1', 'meow2', 'meow3', 'meow4'], .9, () => SYN.meow()); },
@@ -467,6 +470,7 @@
     ['guest', 1, '🛎', 'Первый гость'], ['guest', 10, '🏠', 'Гостеприимный'], ['gift', 5, '🎁', 'Щедрый'], ['giftGet', 1, '🎀', 'Первый подарок'], ['giftGet', 10, '💝', 'Любимчик'], ['learn', 1, '🎓', 'Ученик'], ['learn', 5, '🎓', 'Отличник'], ['quest', 7, '🎯', 'Неделя заданий'], ['quest', 30, '🏆', 'Месяц заданий'],
     ['photo', 1, '📷', 'Фотомодель'], ['relay', 3, '🧶', 'Эстафетная команда'], ['duet', 3, '🎪', 'Цирк'], ['netball', 5, '🏓', 'Пинг-понг'], ['race', 3, '🏁', 'Бегун'], ['days', 7, '📅', 'Неделя вместе'], ['days', 30, '🗓', 'Месяц вместе'], ['days', 100, '💯', 'Сто дней вместе'], ['days', 365, '🎂', 'Год вместе'],
     ['perch', 1, '🪟', 'На подоконнике'], ['cure', 1, '💊', 'Выздоровел'], ['nest', 10, '🪺', 'Строитель'], ['grown', 1, '🌱', 'Вырос'],
+    ['potty', 1, '🚽', 'Первый раз в лоток'], ['potty', 50, '✨', 'Чистюля'], ['walk', 1, '🌳', 'Первая прогулка'], ['walk', 50, '🦮', 'Гулёна'],
   ];
   const careSave = () => { try { localStorage.setItem(careKey, JSON.stringify(care)); } catch (_) { /* приватный режим */ } };   // сохранить care без правки отметок времени
   function achSave() { try { localStorage.setItem(achKey, JSON.stringify(ach)); } catch (_) { /* приватный режим */ } }
@@ -1200,7 +1204,7 @@
   }
   // ---------- лазер, бабочка, лежанка ----------
   let laser = null, butterfly = null, bed = null, lastLaserPounce = -1e9, lastBfly = -1e9;
-  const busy = () => A && ['hang', 'fly', 'sleep', 'eat', 'ride', 'chat', 'carry', 'kick', 'tagChase', 'tagRun', 'stuff', 'wheel', 'bowlCarry', 'beg', 'relayGo', 'relayCarry', 'comfortGo', 'meetGo', 'noteGo', 'noteHold'].includes(A.name);   // миска, просьба поесть, эстафета, утешение, встреча — тоже дело, листик подождёт
+  const busy = () => A && ['hang', 'fly', 'sleep', 'eat', 'ride', 'chat', 'carry', 'kick', 'tagChase', 'tagRun', 'stuff', 'wheel', 'bowlCarry', 'beg', 'relayGo', 'relayCarry', 'comfortGo', 'meetGo', 'noteGo', 'noteHold', 'pottyCall', 'pottyGo', 'pottyHop', 'pottyIn', 'pottyDig', 'pottyShake', 'pottyWait', 'pottyNo', 'pottyMiss', 'pottyWatch', 'walkGo', 'walkOut', 'walkBack'].includes(A.name);   // миска, просьба поесть, эстафета, утешение, встреча — тоже дело, листик подождёт
   function onLaser(l) {                          // красная точка: коты, щенки и птицы гонятся, хомяк с кроликом смотрят
     laser = l; careMark('play');
     if (A && A.name === 'laser') return;
@@ -1500,6 +1504,268 @@
       after: () => { const [tx, ty] = nearPoint(cur.x, cur.y, 40); soarTo(tx, ty, () => { faceT = cur.x > myCenter().x ? 1 : -1; say('Тук-тук! Семечек!', 2600);
         let last = -1e9; start('knock', { pose: 'sit', dur: 4000, rate: 12, mod: (T_, q) => { T_.headY = 8 + Math.max(0, Math.sin(q * 12)) * 6; T_.headTilt = 6; }, tick: () => { if (now() - last > 600) { last = now(); mark('•'); } }, after: () => { play('chirp', true); acts.sit(3000); } }); }); } });
   }
+  const guestT0 = now();
+  // ---------- лоток ----------
+  // После еды (через 10–20 мин), после воды (5–10 мин) и утром при первом запуске питомцу «пора».
+  // Кот зовёт лоток-робот (окно potty): тот приезжает из-за края экрана, кот заходит (в своём окне он
+  // невидим — хвост рисует лоток), выходит, закапывает и проносится по экрану; робот убирается и уезжает.
+  // Пёс просится гулять — уходит за край и возвращается; хомяк и кролик идут в угол, где у них лоток
+  // с опилками (рисуется в окне питомца). Остальные обходятся. Срок — care.potty, переживает перезапуск.
+  // Флаги в localStorage: potty:off (выключено), potty:bin ('0' — без контейнера), potty:net ('0' — не
+  // показывать статус коллегам), potty:fill (сколько походов в контейнере — ведёт окно лотка).
+  const POTTY = CAT ? 'box' : DOG ? 'walk' : (HAM || RAB) ? 'corner' : '';
+  let potty = null, inBox = false, trayOn = false, walking = false, walkTimer = 0, lastPottyTry = -1e9, lastPeekSay = -1e9;
+  let pottySniffer = '', lastPottySniff = -1e9, lastCut = -1e9, guestPottied = false, pottyKid = '';
+  const pottyAlive = () => !!potty && now() - potty.t < 1500;
+  const pottyFlag = (k, def) => { try { const v = localStorage.getItem(k); return v === null ? def : v; } catch (_) { return def; } };
+  const pottyOn = () => pottyFlag('potty:off', '0') !== '1';
+  const boxX = () => (potty.park !== undefined ? potty.park : potty.x);
+  const queasy = () => care.health < 60;           // нездоровится: бегает чаще ещё до того, как начнёт чихать (болезнь — здоровье < 40)
+  function pottyPlan(minMin, maxMin) {              // назначить срок; уже назначенный более ранний не отодвигаем
+    if (GUEST || DEMO || !POTTY) return;
+    const at = Math.round(careNow() + rnd(minMin, maxMin) * 60000);
+    if (care.potty && care.potty > careNow() - 2 * 3600e3 && care.potty <= at) return;
+    care.potty = at; careSave();
+  }
+  function pottyLater(min) { focusUntil = now(); if (!GUEST && !DEMO) { care.potty = Math.round(careNow() + min * 60000); careSave(); } acts.sit(2500); }
+  function pottyMark() {                            // дело сделано: снять срок, посчитать
+    if (GUEST || DEMO) return;
+    care.potty = 0; care.pottyLast = careNow(); careSave();
+    achCount(POTTY === 'walk' ? 'walk' : 'potty');
+  }
+  function pottyTick() {
+    if (DEMO || GUEST || !POTTY || !invoke || !inited || away || walking || dragging || !pottyOn()) return;
+    const d = new Date(), day = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+    if (d.getHours() >= 6) try { if (localStorage.getItem('potty:day:' + PET.label) !== day) { localStorage.setItem('potty:day:' + PET.label, day); pottyPlan(2, 5); } } catch (_) { /* без памяти — без утреннего похода */ }
+    if (queasy() && !care.potty && careNow() - (care.pottyLast || 0) > 40 * 60000) pottyPlan(1, 3);   // нездоровится — бегает чаще, хозяину подсказка
+    if (!care.potty || careNow() < care.potty) return;
+    if (careNow() - care.potty > 2 * 3600e3) { care.potty = 0; careSave(); return; }               // срок давно прошёл (компьютер спал) — забыли
+    if (busy() || begging || quiet() || inCall || hiding || seeking || now() < focusUntil || now() - lastPottyTry < 30000) return;   // подождёт
+    pottyStart();
+  }
+  if (!DEMO && invoke) setInterval(pottyTick, 15000);
+  function pottyStart() {
+    lastPottyTry = now(); focus(70000);
+    if (POTTY === 'walk') return walkGo();
+    if (POTTY === 'corner') return cornerGo();
+    boxCall();
+  }
+  // ----- кот: лоток-робот -----
+  function boxSpot(m) {                             // где встать лотку: в углу, подальше от миски и не на лежанке, гнезде или когтеточке
+    const s = S(), near = (o, px, d) => o && now() - o.t < 3000 && Math.abs(o.x - px) < d * s;
+    const bad = px => (bowlAlive() && Math.abs(bowl.x - px) < 380 * s) || near(bed, px, 210) || near(nest, px, 210) || near(post, px, 160);
+    const spots = [[m.x + m.w - 120 * s, 1], [m.x + 120 * s, -1], [m.x + m.w - 430 * s, 1], [m.x + 430 * s, -1]];
+    const p = spots.find(q => !bad(q[0])) || spots[0];
+    return { x: p[0], side: p[1] };
+  }
+  function boxAsk() {
+    const c = myCenter(), m = monAt(c.x, c.y) || mons[0], s = S(); if (!m) return;
+    const sp = boxSpot(m);
+    invoke('prop_show', { kind: 'potty', x: Math.round(sp.x), y: Math.round(m.y + m.h - 2 * s), data: JSON.stringify({ side: sp.side }) }).catch(() => {});
+  }
+  function boxCall(quietly) {
+    if (!quietly) say(queasy() ? pick(['Живот крутит…', 'Ой. Мне срочно', 'Что-то мне нехорошо… я в лоток']) : pick(['Мне надо…', 'Так. Лоток', 'Я на минутку', 'Где мой лоток?']), 1800);
+    start('pottyCall', { pose: 'sit', dur: 14000, watch: false, mod: (T_, q) => { T_.headTilt = Math.sin(q * 2) * 6; T_.tail = 12; },
+      tick: () => {
+        if (pottyAlive() && potty.phase !== 'in' && potty.phase !== 'out') { A = null; return boxWalk(); }
+        if (!pottyAlive() && now() - (A.req || -1e9) > 2500) { A.req = now(); boxAsk(); }           // нет лотка (или прежний только что уехал) — позвать
+      },
+      after: () => pottyLater(3) });
+  }
+  function boxWalk() {
+    if (!pottyAlive()) return pottyLater(3);
+    focus(70000);
+    const [tx, ty] = nearPoint(boxX(), potty.y, 84);
+    moveTo(tx, ty, (queasy() ? 210 : 150) * SPD, { name: 'pottyGo', pose: 'walk', after: boxArrive });
+  }
+  function boxArrive() {
+    if (!pottyAlive() || potty.phase === 'out') return pottyLater(2);
+    faceT = boxX() > myCenter().x ? 1 : -1;
+    if (isBaby() && !care.pottyOk && !GUEST) return boxMiss();
+    if (potty.full) return boxDirty();
+    if ((potty.by && potty.by !== PET.label) || potty.phase !== 'ready') return boxQueue();
+    boxEnter();
+  }
+  function boxEnter(show) {                         // show — родитель показывает малышу: зашёл и вышел, без счёта
+    const s = S(), home = [x, y], cxp = boxX(), t_in = now();
+    if (T && T.event) T.event.emit('prop-kick', { kind: 'potty', enter: true, by: PET.label, fur: pal.fur, tail: pal.tail || pal.fur, sp: SP }).catch(() => {});
+    start('pottyHop', { pose: 'crouch', dur: 380, rate: 14, mod: (T_) => { T_.squash = .92; },
+      tick: (dt) => { x += (cxp - CX * s - x) * Math.min(1, dt * 9); lift = Math.sin(Math.min(1, (now() - t_in) / 380) * Math.PI) * 18; },
+      exit: () => { lift = 0; },
+      after: () => {
+        if (!pottyAlive() || potty.by !== PET.label) {                                               // кто-то успел раньше — назад, в очередь
+          if (T && T.event) T.event.emit('prop-kick', { kind: 'potty', leave: true, by: PET.label, ok: false }).catch(() => {});
+          x = home[0]; return pottyAlive() ? boxQueue(show) : pottyLater(2);
+        }
+        x = cxp - CX * s; inBox = true;
+        start('pottyIn', { pose: 'sit', dur: show ? 2200 : queasy() ? rnd(8000, 9500) : rnd(5000, 6500), watch: false,
+          tick: () => {
+            if (!pottyAlive()) { A.dur = 0; return; }                                                 // лоток убрали (правый клик, «Убрать все игрушки») — не сидеть невидимкой
+            if (potty.hover && now() - lastPeekSay > 5000) { lastPeekSay = now(); say(pick(['Не смотри!', 'Занято!', 'Эй! Отвернись', 'Я стесняюсь!']), 1500); if (T && T.event) T.event.emit('prop-kick', { kind: 'potty', peek: true }).catch(() => {}); }
+          },
+          exit: () => {                             // и обычный конец, и если перебили командой из трея
+            inBox = false; const ok = !show && now() - t_in > 2800;
+            if (T && T.event) T.event.emit('prop-kick', { kind: 'potty', leave: true, by: PET.label, ok }).catch(() => {});
+            if (ok) pottyMark();
+          },
+          after: () => boxOut(home, show) });
+      } });
+  }
+  function boxOut(home, show) {
+    const s = S(), cxp = pottyAlive() ? boxX() : x + CX * s, sideOut = home[0] + CX * s < cxp ? -1 : 1, t_out = now();
+    const hx = clampPos(cxp - CX * s + sideOut * 92 * s, y)[0];
+    start('pottyHop', { pose: 'crouch', dur: 380, rate: 14, tick: (dt) => { x += (hx - x) * Math.min(1, dt * 9); lift = Math.sin(Math.min(1, (now() - t_out) / 380) * Math.PI) * 16; }, exit: () => { lift = 0; },
+      after: () => {
+        x = hx; faceT = -sideOut;
+        if (show) return boxShown();
+        if (T && T.event) T.event.emit('prop-kick', { kind: 'potty', dig: true }).catch(() => {});
+        if (!quiet() && !night()) play('scratch', true);
+        start('pottyDig', { pose: 'dig', dur: 2000, rate: 10, mod: (T_, q) => { T_.pawL = Math.max(0, Math.sin(q * 20)) * .9; T_.pawR = Math.max(0, Math.sin(q * 20 + Math.PI)) * .9; T_.headTilt = Math.sin(q * 20) * 4; },
+          after: () => start('pottyShake', { pose: 'sit', dur: 900, rate: 16, mod: (T_, q) => { T_.pawR = 1; T_.tilt = Math.sin(q * 40) * 3; }, after: pottyDone }) });
+      } });
+  }
+  function pottyDone() {
+    focusUntil = now();                              // дело сделано — можно снова играть и болтать
+    const s = S(), sn = pottySniffer && friends.get(pottySniffer); pottySniffer = '';
+    if (GUEST) { say(pick(['Спасибо за лоток!', 'У вас хороший лоток', 'Уф. Благодарю']), 2200); return acts.sit(2500); }
+    if (sn && now() - sn.t < 3000 && Math.hypot(sn.x - x, sn.y - y) / s < 420) {                    // пёс совал нос — получит
+      relAdd(sn.label, -1); say(pick(['А ты чего подглядываешь?!', 'Любопытный нос!', 'Это МОЙ лоток']), 1500);
+      return start('sit', { pose: 'sit', dur: 1300, watch: false, after: () => hiss({ x: sn.x + CX * s }) });
+    }
+    say(pick(['Уф. Хорошо', 'Свобода!', 'Дело сделано', 'Чистота — залог здоровья', 'Легко-то как!']), 1800);
+    acts.zoomies(3);                                 // после лотка — круг почёта
+  }
+  function boxQueue(show) {                         // show — ждём, чтобы показать малышу (без ворчания)
+    const who = friends.get(potty.by || potty.last || '');   // кто внутри или только что вышел
+    let lastSaid = now() - 4000, asked = false;   // первое «ну скоро?» — через три секунды, дальше раз в семь
+    say(show ? pick(['Сейчас уберут — и покажу', 'Погоди, робот домоет']) : who && isRival(who.label) ? pick(['Эй! Очередь!', 'Опять без очереди…']) : pick(['Занято…', 'Подожду']), 1600);
+    start('pottyWait', { pose: 'sit', dur: 70000, watch: false, mod: (T_, q) => { T_.tail = 3 + Math.sin(q * 6) * 6; T_.headTilt = Math.sin(q * 1.4) * 8; T_.ear = .3; },
+      tick: () => {
+        if (!pottyAlive()) { A = null; return boxCall(true); }
+        if (T && T.event && now() - (A.want || -1e9) > 900) { A.want = now(); T.event.emit('prop-kick', { kind: 'potty', want: true, by: PET.label }).catch(() => {}); }
+        if (potty.full) { A = null; return show ? boxShown(true) : boxDirty(); }
+        if (potty.phase === 'ready' && !potty.by) { A = null; return boxEnter(show); }
+        if (potty.phase === 'out') { A = null; return show ? boxShown(true) : boxCall(true); }
+        if (!show && now() - lastSaid > 7000) { lastSaid = now(); say(pick(['Ну скоро там?', 'Я тоже хочу!', 'Давай быстрее', 'Мне очень надо…', 'Тук-тук']), 1700);
+          if (!asked && potty.by && T && T.event) { asked = true; T.event.emit('pet-play', { kind: 'pottyhurry', to: potty.by, from: PET.label }).catch(() => {}); } }
+      },
+      after: () => { if (show) return boxShown(true); say('Ладно… потерплю', 1600); pottyLater(4); } });
+  }
+  function boxDirty() {                             // контейнер полон: сидим рядом и жалуемся, пока не опустошат
+    let lastSaid = now();
+    say(pick(['Там грязно!', 'Фу. Контейнер полон', 'Я туда не пойду']), 2200); mark('!');
+    start('pottyNo', { pose: 'sit', dur: 180000, watch: true, mod: (T_, q) => { T_.ear = .5; T_.happy = 0; T_.headTilt += Math.sin(q * 1.5) * 8; T_.tail = 3; },
+      tick: () => {
+        if (!pottyAlive()) { A.dur = 0; return; }
+        if (T && T.event && now() - (A.want || -1e9) > 900) { A.want = now(); T.event.emit('prop-kick', { kind: 'potty', want: true, by: PET.label }).catch(() => {}); }
+        if (!potty.full && potty.phase === 'ready' && !potty.by) { A = null; say(pick(['Спасибо!', 'Другое дело', 'Вот теперь чисто']), 1400); hearts(2); return boxEnter(); }
+        if (now() - lastSaid > 25000) { lastSaid = now(); say(pick(['Щёлкни по лотку — опустоши', 'Убери, а? Я потерплю… немного', 'Контейнер. Полный. Намекаю']), 2600); }
+      },
+      after: () => { say(pick(['Ладно… потерплю', 'Схожу позже']), 1600); pottyLater(10); } });
+  }
+  function boxMiss() {                              // котёнок ещё не умеет: лужица рядом с лотком; родитель покажет, как надо
+    const s = S(), par = parentNear();
+    say(pick(['Ой…', 'Не успел{|а}!', 'Я почти дош{ёл|ла}']), 1800);
+    if (T && T.event) T.event.emit('prop-kick', { kind: 'potty', miss: true, by: PET.label, dx: Math.round((myCenter().x - boxX()) / s) }).catch(() => {});
+    care.pottyMiss = (care.pottyMiss || 0) + 1; care.potty = 0; care.pottyLast = careNow(); careSave();
+    start('pottyMiss', { pose: 'sit', dur: 2600, watch: false, mod: (T_) => { T_.ear = .6; T_.happy = 0; T_.headY = 4; T_.squash = .95; },
+      after: () => {
+        if (par && T && T.event) {
+          say(pick(['Я нечаянно…', 'Оно само', 'А куда надо было?']), 1800); T.event.emit('pet-play', { kind: 'pottyteach', to: par.label, from: PET.label }).catch(() => {});
+          return start('pottyWatch', { pose: 'sit', dur: 32000, watch: false, mod: (T_, q) => { T_.headTilt = Math.sin(q * 2) * 10; T_.pup = 1; },
+            after: () => { care.pottyOk = true; careSave(); focusUntil = now(); acts.sit(2000); } });   // родитель занят — дойдёт своим умом
+        }
+        if (care.pottyMiss >= 2) { care.pottyOk = true; careSave(); say(pick(['В следующий раз попаду!', 'Я понял{|а}, куда надо']), 2200); }
+        focusUntil = now(); acts.sit(2500);
+      } });
+  }
+  function boxTeach(kid) {                          // родитель: «смотри, как надо» — зашёл на пару секунд и вышел
+    if (!CAT || GUEST || busy() || !pottyAlive()) return;
+    pottyKid = kid; focus(45000);
+    say(pick(['Смотри, как надо', 'Эх, малыш. Показываю один раз', 'Иди сюда, научу']), 2000);
+    const [tx, ty] = nearPoint(boxX(), potty.y, 84);
+    moveTo(tx, ty, 170 * SPD, { name: 'pottyGo', pose: 'walk', after: () => {
+      if (!pottyAlive() || potty.phase === 'out') return boxShown(true);
+      faceT = boxX() > myCenter().x ? 1 : -1;
+      if (potty.phase === 'ready' && !potty.by) return boxEnter(true);
+      boxQueue(true);                              // робот ещё вытирает лужицу
+    } });
+  }
+  function boxShown(fail) {                         // fail — показать не вышло: малыш дойдёт своим умом
+    focusUntil = now(); if (fail) { pottyKid = ''; return acts.sit(2000); }
+    say(pick(['Вот так. Понятно?', 'Зашли, сделали, закопали', 'Теперь ты']), 2000);
+    if (pottyKid && T && T.event) T.event.emit('pet-play', { kind: 'pottyshow', to: pottyKid, from: PET.label }).catch(() => {});
+    pottyKid = ''; acts.sit(3000);
+  }
+  function pottyReceive(m) {                        // сообщения между питомцами про лоток; проходят и сквозь focus
+    if (m.kind === 'pottyhurry') { if (inBox) { say(pick(['Занято!', 'Сейчас-сейчас', 'Не торопи']), 1400); if (T && T.event) T.event.emit('prop-kick', { kind: 'potty', peek: true }).catch(() => {}); } return; }
+    if (m.kind === 'pottysniff') { pottySniffer = m.from; if (inBox) { say(pick(['Занято! Уйди!', 'Убери нос!', 'Ффф!']), 1400); if (T && T.event) T.event.emit('prop-kick', { kind: 'potty', peek: true }).catch(() => {}); } return; }
+    if (m.kind === 'pottyteach') return boxTeach(m.from);
+    if (m.kind === 'pottyshow') {                   // малышу показали — идёт сам
+      if (GUEST || !pottyAlive()) return; care.pottyOk = true; careSave();
+      say(pick(['Понял{|а}! Теперь я', 'Я тоже так могу!', 'Ага! Вот куда']), 1800); A = null; return boxWalk();
+    }
+    if (m.kind === 'pottyask') {                    // гость спросил, можно ли в наш лоток
+      if (GUEST || busy()) return; const f = friends.get(m.from); if (f) faceT = f.x > x ? 1 : -1;
+      say(pick(['Конечно! Вон там', 'Пользуйся. Только закопай', 'Лоток в углу, заходи']), 2200); relAdd(m.from, 1);
+    }
+  }
+  function guestPotty() {                           // гость-кот вежливо просится в хозяйский лоток
+    const f = friendNear(900); focus(70000);
+    say(pick(['А можно в ваш лоток?', 'Извините… где тут лоток?', 'Можно? Я быстро']), 2200);
+    if (f && T && T.event) T.event.emit('pet-play', { kind: 'pottyask', to: f.label, from: PET.label, guestName: NAME }).catch(() => {});
+    start('pottyCall', { pose: 'sit', dur: 2400, watch: false, after: () => boxCall(true) });
+  }
+  // ----- пёс: гулять -----
+  function walkGo() {
+    const s = S(), c = myCenter(), m = monAt(c.x, c.y) || mons[0]; if (!m) return pottyLater(5);
+    const side = c.x < m.x + m.w / 2 ? -1 : 1, ex = side < 0 ? m.x - 200 * s : m.x + m.w - 20 * s;
+    say(queasy() ? pick(['Мне срочно на улицу…', 'Ой. Гулять. Быстро']) : pick(['Гулять! Гулять!', 'Мне на улицу!', 'Я быстро, до кустиков', 'Поводок! Где поводок?']), 2000);
+    if (!quiet() && !night()) play('bark', false, 1);
+    fx('zzz', '🦮', 10, -34, 1600);
+    moveTo(...clampPos(ex, floorY(m), m), 200 * SPD, { name: 'walkGo', pose: 'walk', after: () => {
+      walking = { side, m };
+      invoke('pet_visible', { label: PET.label, on: false }).catch(() => {});
+      start('walkOut', { pose: 'sit', dur: 1e9 });
+      clearTimeout(walkTimer); walkTimer = setTimeout(walkBack, Math.round(rnd(12000, 18000)));   // спрятанное окно не крутит кадры — возвращаемся по системному таймеру
+    } });
+  }
+  function walkBack() {
+    if (!walking) return;
+    const { side, m } = walking, s = S(); walking = false; clearTimeout(walkTimer);
+    x = side < 0 ? m.x - 200 * s : m.x + m.w - 20 * s; y = floorY(m); faceT = side < 0 ? 1 : -1;
+    invoke('pet_visible', { label: PET.label, on: true }).catch(() => {});
+    pottyMark();
+    const tx = clampPos(x + (side < 0 ? 1 : -1) * rnd(180, 340) * s, floorY(m), m)[0];
+    moveTo(tx, floorY(m), 220 * SPD, { name: 'walkBack', pose: 'walk', after: () => { focusUntil = now(); say(pick(['Хорошо погулял{|а}!', 'Все кустики проверены', 'На улице — красота', 'Я вернул{ся|ась}!']), 2200); hearts(2); acts.pant(); } });
+  }
+  // ----- хомяк и кролик: уголок с опилками -----
+  function cornerGo() {
+    const s = S(), c = myCenter(), m = monAt(c.x, c.y) || mons[0]; if (!m) return pottyLater(5);
+    const side = c.x < m.x + m.w / 2 ? -1 : 1, [tx, ty] = clampPos(side < 0 ? m.x - 20 * s : m.x + m.w - (W - 20) * s, floorY(m), m);
+    say(queasy() ? pick(['Ой-ой. Я в уголок', 'Живот крутит…']) : pick(['Я в уголок', 'Минутку. Личное дело', HAM ? 'Пи. Мне надо' : 'Отойду в уголок']), 1800);
+    moveTo(tx, ty, (queasy() ? 220 : 150) * SPD, { name: 'pottyGo', pose: 'walk', after: () => {
+      faceT = side; trayOn = true; const t_in = now();
+      start('pottyIn', { pose: 'sit', dur: queasy() ? 6000 : rnd(3200, 4200), watch: false, mod: (T_, q) => { T_.ear = .35; T_.squash = .95; T_.tail = 20; T_.headY = 2; T_.bob += Math.sin(q * 14) * .5; },
+        tick: () => { const c2 = myCenter(); if (Math.hypot(cur.x - c2.x, cur.y - c2.y) / S() < 110 && now() - lastPeekSay > 5000) { lastPeekSay = now(); say(pick(['Не смотри!', 'Отвернись, пожалуйста', 'Я стесняюсь!']), 1500); mark('!'); } },
+        exit: () => { trayOn = false; if (now() - t_in > 2500) pottyMark(); },
+        after: () => start('pottyDig', { pose: 'dig', dur: 1800, rate: 10, mod: (T_, q) => { T_.pawL = Math.max(0, Math.sin(q * 20)) * .9; T_.pawR = Math.max(0, Math.sin(q * 20 + Math.PI)) * .9; },
+          enter: () => { trayOn = true; if (!quiet() && !night()) play('scratch', true); }, exit: () => { trayOn = false; },
+          after: () => { focusUntil = now(); say(pick(['Готово!', 'Чистота', 'Уф']), 1400); if (RAB) acts.binky(); else acts.wash(); } }) });
+    } });
+  }
+  function drawTray(front) {                        // лоток с опилками под хомяком и кроликом: задняя стенка до питомца, передняя — поверх лап
+    if (!trayOn) return;
+    if (!front) {
+      ctx.fillStyle = 'rgba(0,0,0,.14)'; ctx.beginPath(); ctx.ellipse(0, 5, 52, 6, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#9a6f42'; ctx.beginPath(); ctx.ellipse(0, -4, 48, 10, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ead8a8'; ctx.beginPath(); ctx.ellipse(0, -4, 44, 8, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(170,140,80,.55)'; for (let i = 0; i < 14; i++) { ctx.beginPath(); ctx.ellipse(-38 + i * 5.8, -5 + (i * 5 % 4), 2.4, 1, i, 0, Math.PI * 2); ctx.fill(); }
+      return;
+    }
+    ctx.fillStyle = '#b8874f'; ctx.beginPath(); ctx.moveTo(-48, -4); ctx.quadraticCurveTo(-46, 7, -38, 7); ctx.lineTo(38, 7); ctx.quadraticCurveTo(46, 7, 48, -4); ctx.quadraticCurveTo(0, 8, -48, -4); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(90,60,30,.4)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-48, -4); ctx.quadraticCurveTo(0, 8, 48, -4); ctx.stroke();
+  }
   // ---------- задания дня ----------
   // Три задания на день (выбор по дате, одинаков у всех окон), прогресс — сумма счётчиков ach:<метка>
   // всех своих питомцев минус база на начало дня. Считает старший; запись quests:<день> читает окно «Питомцы».
@@ -1748,6 +2014,7 @@
   }
   function playReceive(m) {
     if (!m || m.to !== PET.label || dragging) return;
+    if (/^potty/.test(m.kind || '')) return pottyReceive(m);
     if (now() < focusUntil && !(m.kind === 'tag' && m.role === 'end') && m.kind !== 'race' && m.kind !== 'note' && m.kind !== 'selfie' && m.kind !== 'trick' && m.kind !== 'peace' && !(m.kind === 'relay' && m.role !== 'line')) return;   // заняты делом поважнее
     if (m.kind === 'steal') {                    // у кота стащили еду
       if (!CAT) return;
@@ -2350,7 +2617,8 @@
   function guestPlan() {
     if (!GUEST || guestLeaving) return;
     const f = friendNear(700);
-    if (f && !busy() && !chat && !race) {
+    if (CAT && !guestPottied && pottyOn() && !busy() && !chat && !race && now() - guestT0 > 25000 && Math.random() < .3) { guestPottied = true; guestPotty(); }
+    else if (f && !busy() && !chat && !race) {
       const r = Math.random();
       if (r < .25 && !guestRaced) { guestRaced = true; raceStart(f); }
       else if (r < .45) chatStart(f);
@@ -2526,7 +2794,7 @@
     if (FLY) return soarTo(tx, ty, () => { faceT = cur.x > myCenter().x ? 1 : -1; acts.voice(true); }, { follow: 60, dur: 12000 });
     moveTo(tx, ty, DOG ? 360 : HAM ? 260 : 300, { follow: 80, dur: 12000, after: () => { faceT = cur.x > myCenter().x ? 1 : -1; acts.voice(true); } });
   }
-  function feedCore() { careMark('fed'); achCount('fed'); weightTick(careNow() - (care.lastMeal || 0) < 3 * 3600e3 ? .6 : .1); care.lastMeal = careNow(); careSave(); }
+  function feedCore() { careMark('fed'); achCount('fed'); weightTick(careNow() - (care.lastMeal || 0) < 3 * 3600e3 ? .6 : .1); care.lastMeal = careNow(); careSave(); pottyPlan(10, 20); }
   // Еда по видам: из трея «Покормить…» приходит feed_<что>. Любимое — сердечки и «Любимое!», подходящее — просто
   // ест, чужое — нюхает и отказывается (голод не сбрасывается), вода — пьют все. В миске видно, что насыпали.
   const FOOD = {
@@ -2556,7 +2824,7 @@
   }
   function drink() {                             // вода: миска синяя, лакают все, голод не трогаем
     if ((CAT || DOG) && bowlAlive() && T && T.event) { if (!bowl.full) T.event.emit('prop-kick', { kind: 'bowl', fill: true, food: 'water' }).catch(() => {}); }
-    say(pick(['💧 Пить!', 'Водичка…', 'Лак-лак-лак']), 2000);
+    say(pick(['💧 Пить!', 'Водичка…', 'Лак-лак-лак']), 2000); pottyPlan(5, 10);
     start('drink', { pose: BIRD ? 'sit' : 'eat', dur: 3500, mod: (T_, q) => { T_.headY = 12 + Math.max(0, Math.sin(q * 10)) * 3; T_.mouth = Math.sin(q * 10) > 0 ? .4 : .1; T_.armL = T_.armR = 0; }, after: () => { hearts(1); care.health = Math.min(100, (care.health || 0) + 2); careSave(); acts.sit(2000); } });
   }
   function feedPlain() {                         // еда «из воздуха»: птица, хомяк и все, у кого нет миски
@@ -2632,7 +2900,8 @@
     if (/^(eat|bowlEat|drink|bowlCarry|beg)$/.test(n)) return 'ест';
     if (/^(tag|ball|kick|mouse|relay|hide|race|chase|disco|dance|pounce|found)/.test(n)) return 'играет';
     if (n === 'sick' || n === 'sneeze') return 'болеет';
-    if (/^(walk|run|soar|hop|zoomies|fly)$/.test(n)) return 'гуляет';
+    if (/^potty/.test(n)) return pottyFlag('potty:net', '1') === '0' ? 'сидит' : 'в лотке';
+    if (/^(walk|run|soar|hop|zoomies|fly|walkGo|walkOut|walkBack)$/.test(n)) return 'гуляет';
     if (n === 'chat') return 'болтает';
     return 'сидит';
   }
@@ -2818,6 +3087,27 @@
           if (T && T.event) T.event.emit('pet-play', { to: f.label, from: PET.label, kind: 'steal' }).catch(() => {});
           say(pick(['Ам! Моё!', 'Хрум-хрум!', 'Спасибо, кот!']), 1200); play('bark', false, 1);
           start('eat', { pose: 'eat', dur: 1500, mod: chew, after: () => { const away = side, [tx2, ty2] = clampPos(x + away * 500 * s, y); moveTo(tx2, ty2, 340, { name: 'tagRun', dur: 6000, after: () => acts.pant() }); } });
+        } });
+      }
+    }
+    // соперник пошёл к лотку — влезть без очереди
+    if (CAT && !GUEST && !isBaby() && now() - lastCut > 20 * 60000 && pottyOn() && pottyAlive() && potty.phase === 'ready' && !potty.by && A && ['sit', 'look', 'walk', 'loaf', 'sniff', 'groom'].includes(A.name)) {
+      for (const f of friends.values()) {
+        if (now() - f.t > 1500 || f.act !== 'pottyGo' || f.label === 'guest' || !isRival(f.label)) continue;
+        lastCut = now(); relAdd(f.label, -1); focus(70000); say(pick(['Я перв{ый|ая}!', 'Лоток мой!', 'Подождёшь']), 1500);
+        const [tx, ty] = nearPoint(boxX(), potty.y, 84); return moveTo(tx, ty, 330 * SPD, { name: 'pottyGo', pose: 'walk', after: boxArrive });
+      }
+    }
+    // пёс любопытствует: кот в лотке — подойти и сунуть нос
+    if (DOG && !GUEST && now() - lastPottySniff > 10 * 60000 && pottyAlive() && potty.by && A && ['sit', 'look', 'walk', 'lie', 'pant', 'sniff'].includes(A.name)) {
+      const f = friends.get(potty.by);
+      if (f && f.sp === 'cat' && now() - f.t < 1500 && Math.abs(potty.x - myCenter().x) / s < 900) {
+        lastPottySniff = now(); say(pick(['Что там у тебя?', '*нюхает лоток*', 'Интересненько…']), 1600);
+        const [tx, ty] = nearPoint(potty.x, potty.y, 100);
+        return moveTo(tx, ty, 120, { name: 'sniff', pose: 'sniff', after: () => {
+          faceT = potty && potty.x > myCenter().x ? 1 : -1;
+          if (T && T.event) T.event.emit('pet-play', { kind: 'pottysniff', to: f.label, from: PET.label }).catch(() => {});
+          start('sniff', { pose: 'sniff', dur: 2600, rate: 5, mod: (T_, q) => { T_.headY += Math.sin(q * 9) * 1.2; T_.headTilt += Math.sin(q * 5) * 5; }, after: () => acts.sit(4000) });
         } });
       }
     }
@@ -3033,7 +3323,7 @@
       const lx = (cur.x - sentX) / s, ly = (cur.y - sentY) / s, r = hitRect();
       const over = lx >= r.l && lx <= r.r && ly >= r.t && ly <= r.b;
       const overNote = noteOn && noteEl && (() => { const r = noteEl.getBoundingClientRect(); return lx >= r.left && lx <= r.right && ly >= r.top && ly <= r.bottom; })();   // карточка записки ловит курсор (кнопка ✕)
-      const ignore = !(over || overNote || dragging || pressed);
+      const ignore = inBox || !(over || overNote || dragging || pressed);   // в лотке окно пустое — щелчки уходят лотку
       if (ignore !== ignoreSent) args.ignore = ignoreSent = ignore;
       if (n - lastEmit > 150 && T.event) {
         lastEmit = n; const h = info ? toCanvas(info.top.x, info.top.y) : { x: CX, y: 40 };
@@ -3046,6 +3336,7 @@
   if (T.event) {
     T.event.listen('pet', e => {
       if (dragging) return;
+      if (walking) walkBack();                    // пёс на прогулке — зовут, значит домой
       const c = e.payload;
       if (c === 'photo') return photo();
       if (c === 'pomodoro') { if (PET.label === leaderLabel()) pomodoro(!pomo); return; }
@@ -3062,7 +3353,7 @@
       if (!visitsOn) { guestQueue.length = 0; if (GUEST && !guestLeaving) { overnight = true; say(pick(['Хозяева просят не беспокоить. Ухожу', 'Понял{|а}, гостей не ждут. До встречи!']), 2400); setTimeout(guestLeave, 600); } }
       if (!GUEST && PET.label === leaderLabel()) hello();   // портал узнаёт сразу, а не через минуту
     });
-    T.event.listen('recall', () => { if (away) comeBack(); else invoke('pet_visible', { label: PET.label, on: true }).catch(() => {}); });
+    T.event.listen('recall', () => { if (walking) return walkBack(); if (away) comeBack(); else invoke('pet_visible', { label: PET.label, on: true }).catch(() => {}); });
     T.event.listen('visit-to', e => { const q = e.payload || {}; if (q.label !== PET.label || GUEST) return; if (away) return say('Я и так в гостях', 1600); goVisit({ client: q.to, name: q.name || 'коллега' }, true, q.msg || ''); });
     T.event.listen('caldav', () => { invoke('caldav_get').then(c => { calDav = !!(c && c.user && c.has_pass); calEvents = []; calendarFetch(); }).catch(() => {}); });
     T.event.listen('pet-look', e => {
@@ -3104,6 +3395,7 @@
       if (pp.kind === 'mouse') return onMouse(Object.assign(pp, { t: now() }));
       if (pp.kind === 'gift') return onGift(Object.assign(pp, { t: now() }));
       if (pp.kind === 'poll') return onPoll(pp);
+      if (pp.kind === 'potty') { const was = potty && potty.phase; potty = Object.assign(pp, { t: now() }); if (pp.phase === 'clean' && was !== 'clean' && pp.last === PET.label && !quiet() && !night()) play('whirr', true); return; }   // убирается за мной — мотор слышно
       if (pp.kind === 'bowl') { bowl = Object.assign(pp, { t: now() }); if (pp.full && (CAT || DOG) && !begging && !GUEST && !busy() && now() - lastBowlEat > 60000 && (pp.food === 'water' || careNow() - care.fed > 1800e3) && foodTaste(pp.food || '') !== 'no' && Math.hypot(pp.x - myCenter().x, pp.y - myCenter().y) / S() < 900) bowlEat(); return; }   // насыпали — голодный идёт есть
       if (pp.kind === 'bed') { bed = Object.assign(pp, { t: now() }); return; }
       if (pp.kind === 'bubbles') return onBubbles(Object.assign(pp, { t: now() }));
@@ -3120,7 +3412,7 @@
       }
     });
   }
-  if (window.__PET_TEST) window.__pt = { acts, feed, come, playMode, pet, hiss, play, perch, perchOk, deskPoll, achCount, cure, trick, trickShow, gather, onGoal, dailyTick, inputPoll, dance, set nest(v) { nest = v; }, get score() { return score; }, set quietUntil(v) { quietUntil = v; }, get quietUntil() { return quietUntil; }, get ach() { return ach; }, get care() { return care; }, goVisit, comeBack, hello, inboxPoll, guestArrive, guestLeave, visit, leap, flee, friends, cheer, chatStart, chatReceive, tagInvite, playReceive, ballStart, fetch_, onUserKick, onLaser, onButterfly, onMouse, mouseEscape, disco, discoAll, onGift, seasonTick, remindersTick, dozeOff, welcomeBack, quietSched, questsTick, relAdd, relGet, relSet, relDecay, peaceGo, resetGuestGate: () => { lastGuestAt = -1e9; }, get visitsOn() { return visitsOn; }, get SCALE() { return SCALE; }, get focusLeft() { return focusUntil - now(); }, get lastReact() { return now() - lastReact; }, sickTick, sickShow, bowlKick, bowlFeedShow, giftCarryOut, feed2: feed, drink, foodTaste, maybeInfect, infect: () => { lastInfect = -1e9; const f = { sick: true, name: 'тест' }; const r = Math.random; Math.random = () => 0; try { maybeInfect(f); } finally { Math.random = r; } }, coarseAct, giftStore, get guestSick() { return guestSick; }, noteDeliver, noteStore, guestQueue, guestBusy, nrelGet, nrelSet, nrelAdd, netFriends, meetGuest, netBallSend, netBallReceive, pickPeer, groupPhoto, overnightStay, guestFriendHere, quietEnd, scheduleGiftBack, giftBackTick, friendOwner, relayStart, relayMates, knowsTrick, comfort, comfortTarget, start, isBaby, guestTrick, onPoll, myPollsTick, yearCard, composeSelfie, albumUpload, umbrellaPhrase, set weatherDay(v) { weatherDay = v; }, set mood(v) { mood = v; }, get mood() { return mood; }, askFood, bowlBring, beg, bowlEat, birdAsk, get bowl() { return bowl; }, set begging(v) { begging = v; }, get SEA() { return SEA; }, set SEA(v) { SEA = v; }, set weekCrown(v) { weekCrown = v; }, get gift() { return gift; }, raceStart, get race() { return race; }, guestPlan, get mouse() { return mouse; }, hideParty, seekStart, get seeking() { return seeking; }, nag, hideAndSeek, shellGame, shellPick, pomodoro, pomoTick, callMode, nudgeCursor, photo, parseIcs, onBubbles, scratchPost, set calEvents(v) { calEvents = v; }, calendarTick, get inCall() { return inCall; }, get shell() { return shell; }, get hiding() { return hiding; }, get pomo() { return pomo; }, set pomo(v) { pomo = v; }, weatherPhrase, set weather(v) { weather = v; }, set HOL(v) { HOL = v; }, get ball() { return ball; }, get bed() { return bed; }, get pal() { return pal; }, get chat() { return chat; }, get A() { return A; }, get pos() { return [x, y]; } };
+  if (window.__PET_TEST) window.__pt = { acts, feed, come, playMode, pet, hiss, play, perch, perchOk, deskPoll, achCount, cure, trick, trickShow, gather, onGoal, dailyTick, inputPoll, dance, set nest(v) { nest = v; }, get score() { return score; }, set quietUntil(v) { quietUntil = v; }, get quietUntil() { return quietUntil; }, get ach() { return ach; }, get care() { return care; }, goVisit, comeBack, hello, inboxPoll, guestArrive, guestLeave, visit, leap, flee, friends, cheer, chatStart, chatReceive, tagInvite, playReceive, ballStart, fetch_, onUserKick, onLaser, onButterfly, onMouse, mouseEscape, disco, discoAll, onGift, seasonTick, remindersTick, dozeOff, welcomeBack, quietSched, questsTick, relAdd, relGet, relSet, relDecay, peaceGo, resetGuestGate: () => { lastGuestAt = -1e9; }, get visitsOn() { return visitsOn; }, get SCALE() { return SCALE; }, get focusLeft() { return focusUntil - now(); }, get lastReact() { return now() - lastReact; }, sickTick, sickShow, bowlKick, bowlFeedShow, giftCarryOut, feed2: feed, drink, foodTaste, maybeInfect, infect: () => { lastInfect = -1e9; const f = { sick: true, name: 'тест' }; const r = Math.random; Math.random = () => 0; try { maybeInfect(f); } finally { Math.random = r; } }, coarseAct, giftStore, get guestSick() { return guestSick; }, noteDeliver, noteStore, guestQueue, guestBusy, nrelGet, nrelSet, nrelAdd, netFriends, meetGuest, netBallSend, netBallReceive, pickPeer, groupPhoto, overnightStay, guestFriendHere, quietEnd, scheduleGiftBack, giftBackTick, friendOwner, relayStart, relayMates, knowsTrick, comfort, comfortTarget, start, isBaby, guestTrick, onPoll, myPollsTick, yearCard, composeSelfie, albumUpload, umbrellaPhrase, set weatherDay(v) { weatherDay = v; }, set mood(v) { mood = v; }, get mood() { return mood; }, askFood, bowlBring, beg, bowlEat, birdAsk, get bowl() { return bowl; }, set begging(v) { begging = v; }, get SEA() { return SEA; }, set SEA(v) { SEA = v; }, set weekCrown(v) { weekCrown = v; }, get gift() { return gift; }, raceStart, get race() { return race; }, guestPlan, get mouse() { return mouse; }, hideParty, seekStart, get seeking() { return seeking; }, nag, hideAndSeek, shellGame, shellPick, pomodoro, pomoTick, callMode, nudgeCursor, photo, parseIcs, onBubbles, scratchPost, set calEvents(v) { calEvents = v; }, calendarTick, get inCall() { return inCall; }, get shell() { return shell; }, get hiding() { return hiding; }, get pomo() { return pomo; }, set pomo(v) { pomo = v; }, weatherPhrase, set weather(v) { weather = v; }, set HOL(v) { HOL = v; }, get ball() { return ball; }, get bed() { return bed; }, get pal() { return pal; }, get chat() { return chat; }, pottyTick, pottyStart, pottyPlan, boxCall, boxWalk, walkGo, walkBack, cornerGo, guestPotty, set lastPottyTry(v) { lastPottyTry = v; }, set lastCut(v) { lastCut = v; }, set lastPottySniff(v) { lastPottySniff = v; }, get potty() { return potty; }, get inBox() { return inBox; }, get trayOn() { return trayOn; }, get walking() { return !!walking; }, get A() { return A; }, get pos() { return [x, y]; } };
   window.addEventListener('resize', resize);
   refreshScreens().then(() => requestAnimationFrame(loop));
   setInterval(refreshScreens, 10000);
